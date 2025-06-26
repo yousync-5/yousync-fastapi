@@ -13,10 +13,10 @@ pip-wheel-metadata/
 .DS_Store
 
 # Virtualenv
-venv/
-ENV/
-env/
-.venv/
+# venv/
+# ENV/
+# env/
+# .venv/
 
 # IDE / Editor
 .vscode/
@@ -34,8 +34,8 @@ htmlcov/
 pytest_cache/
 
 # 환경 변수
-.env
-.env.*
+# .env
+# .env.*
 
 # Database / Alembic
 *.sqlite3
