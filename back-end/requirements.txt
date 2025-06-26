@@ -1,12 +1,14 @@
 # FastAPI 및 관련 패키지들
-fastapi          # FastAPI 웹 프레임워크
-uvicorn          # ASGI 서버
-pydantic         # 데이터 검증 및 직렬화
+fastapi==0.115.13          # FastAPI 웹 프레임워크 (최신 안정 버전)
+uvicorn[standard]==0.34.3  # ASGI 서버 (표준 기능 포함)
+
+# 데이터 검증 및 직렬화
+pydantic==2.11.7          # 데이터 검증 라이브러리 (최신 버전)
 
 # 데이터베이스 관련
-sqlalchemy       # ORM (Object-Relational Mapping)
-psycopg2-binary  # PostgreSQL 드라이버
-alembic          # 데이터베이스 마이그레이션 도구
+SQLAlchemy==2.0.41        # Python SQL toolkit and ORM (최신 2.0 버전)
+psycopg2-binary==2.9.10   # PostgreSQL adapter for Python
 
-# 환경설정
-python-dotenv    # .env 파일에서 환경변수 로드
+# 환경설정 및 유틸리티
+python-dotenv==1.1.1      # .env 파일에서 환경변수 로드
+python-multipart==0.0.20  # multipart/form-data 파싱을 위한 라이브러리

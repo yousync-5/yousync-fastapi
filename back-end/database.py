@@ -9,7 +9,7 @@ load_dotenv()
 
 # PostgreSQL 데이터베이스 연결 설정
 # 환경변수 DATABASE_URL이 있으면 사용, 없으면 기본값 사용
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://jeonghwan@localhost:5432/fastapi_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:rgsqOycPGkDEuxADVfhbyCFgwDEzYiCX@ballast.proxy.rlwy.net:31495/railway")
 # SQLite를 사용하려면 다음 줄의 주석을 해제하세요:
 # DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
