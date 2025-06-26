@@ -14,6 +14,7 @@ router = APIRouter(
     tags=["scripts"]    # OpenAPI 문서에서 이 그룹의 태그명
 )
 
+
 # 스크립트 생성 API - POST 요청으로 새로운 스크립트 데이터를 받아 데이터베이스에 저장
 @router.post("/", response_model=ScriptSchema)
 def create_script(script: ScriptCreate, db: Session = Depends(get_db)):
@@ -30,17 +31,24 @@ def create_script(script: ScriptCreate, db: Session = Depends(get_db)):
     db.refresh(db_script)  # 저장된 데이터를 다시 불러와서 ID 등 업데이트
     return db_script
 
+
 # 모든 스크립트 조회 API - 페이지네이션 지원 (skip: 건너뛸 개수, limit: 가져올 최대 개수)
 @router.get("/", response_model=List[ScriptSchema])
-def read_scripts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_scripts(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
     """
     모든 스크립트 목록을 조회합니다.
     
     - **skip**: 건너뛸 항목 수 (기본값: 0)
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
-    scripts = db.query(Script).offset(skip).limit(limit).all()  # SQL: SELECT * FROM scripts LIMIT 100 OFFSET 0
+    # SQL: SELECT * FROM scripts LIMIT 100 OFFSET 0
+    scripts = db.query(Script).offset(skip).limit(limit).all()
     return scripts
+
 
 # 특정 스크립트 조회 API - ID로 하나의 스크립트만 가져오기
 @router.get("/{script_id}", response_model=ScriptSchema)
@@ -50,14 +58,20 @@ def read_script(script_id: int, db: Session = Depends(get_db)):
     
     - **script_id**: 조회할 스크립트의 ID
     """
-    script = db.query(Script).filter(Script.id == script_id).first()  # SQL: SELECT * FROM scripts WHERE id = script_id
+    # SQL: SELECT * FROM scripts WHERE id = script_id
+    script = db.query(Script).filter(Script.id == script_id).first()
     if script is None:  # 해당 ID의 스크립트가 없으면 404 에러 반환
         raise HTTPException(status_code=404, detail="Script not found")
     return script
 
+
 # 스크립트 수정 API - PUT 요청으로 기존 스크립트 데이터를 업데이트
 @router.put("/{script_id}", response_model=ScriptSchema)
-def update_script(script_id: int, script: ScriptCreate, db: Session = Depends(get_db)):
+def update_script(
+    script_id: int,
+    script: ScriptCreate,
+    db: Session = Depends(get_db)
+):
     """
     기존 스크립트를 수정합니다.
     
@@ -77,6 +91,7 @@ def update_script(script_id: int, script: ScriptCreate, db: Session = Depends(ge
     db.commit()  # 변경사항 저장
     db.refresh(db_script)  # 업데이트된 데이터 다시 로드
     return db_script
+
 
 # 스크립트 삭제 API - DELETE 요청으로 특정 스크립트를 삭제
 @router.delete("/{script_id}")

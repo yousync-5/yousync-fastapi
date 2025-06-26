@@ -1,0 +1,52 @@
+{
+  "name": "FastAPI Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "api",
+  "workspaceFolder": "/app",
+  
+  // VS Code 설정
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.flake8",
+        "ms-python.black-formatter",
+        "ms-vscode.vscode-json",
+        "ms-vscode.remote-containers",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "python.formatting.blackPath": "/usr/local/bin/black",
+        "files.autoSave": "onFocusChange"
+      }
+    }
+  },
+
+  // 컨테이너 시작 후 실행할 명령어
+  "postCreateCommand": "pip install -r requirements.txt",
+  
+  // 개발용 포트 포워딩
+  "forwardPorts": [8000, 5432, 5050],
+  "portsAttributes": {
+    "8000": {
+      "label": "FastAPI Server",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "5050": {
+      "label": "pgAdmin",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // 컨테이너 실행 사용자
+  "remoteUser": "root"
+}

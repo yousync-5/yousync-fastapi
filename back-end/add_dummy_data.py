@@ -4,6 +4,7 @@ from models import Base, Script, Movie
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
+
 # 더미 데이터 추가
 def add_dummy_data():
     db = SessionLocal()
@@ -17,7 +18,9 @@ def add_dummy_data():
             translation="이제 우린 그냥 고개 숙이고, 우리 자리나 걱정하면서 사는 거야.",
             url="https://youtube.com",
             actor_pitch_values=[200, 240, 220, 234, 232, 221, 210, 205, 253],
-            background_pitch_values=[300, 231, 452, 540, 480, 650, 439, 530, 450]
+            background_pitch_values=[
+                300, 231, 452, 540, 480, 650, 439, 530, 450
+            ]
         )
         
         # Movie 더미 데이터
@@ -42,6 +45,7 @@ def add_dummy_data():
         db.rollback()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     add_dummy_data()

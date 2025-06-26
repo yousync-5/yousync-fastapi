@@ -1,0 +1,76 @@
+# Docker Compose를 사용한 멀티 컨테이너 애플리케이션 구성
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스 서비스
+  db:
+    image: postgres:15-alpine  # 가벼운 Alpine Linux 기반 PostgreSQL 15
+    container_name: movie_script_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-movie_script_db}      # 데이터베이스 이름
+      POSTGRES_USER: ${DB_USER:-admin}              # 사용자명
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword123}  # 비밀번호
+    ports:
+      - "5432:5432"  # 호스트:컨테이너 포트 매핑
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # 데이터 영속성을 위한 볼륨 마운트
+      - ./init-db:/docker-entrypoint-initdb.d/  # 초기 DB 스크립트들
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 백엔드 서비스
+  api:
+    build:
+      context: ./back-end  # Dockerfile이 있는 디렉토리
+      dockerfile: Dockerfile
+    container_name: movie_script_api
+    restart: always
+    environment:
+      # 데이터베이스 연결 정보 (컨테이너 내부에서 사용)
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-securepassword123}@db:5432/${DB_NAME:-movie_script_db}
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword123}
+      POSTGRES_DB: ${DB_NAME:-movie_script_db}
+      POSTGRES_HOST: db  # Docker Compose에서 서비스명으로 통신
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-here}
+    ports:
+      - "8000:8000"  # 호스트:컨테이너 포트 매핑
+    volumes:
+      - ./back-end:/app  # 개발시 코드 변경 사항을 실시간 반영
+    depends_on:
+      db:
+        condition: service_healthy  # DB가 완전히 준비된 후에 API 서버 시작
+    networks:
+      - app-network
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # pgAdmin (PostgreSQL 관리 도구) - 선택사항
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: movie_script_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}  # pgAdmin 로그인 이메일
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}     # pgAdmin 로그인 비밀번호
+    ports:
+      - "5050:80"  # http://localhost:5050 으로 접근
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+# 네트워크 정의 (컨테이너 간 통신용)
+networks:
+  app-network:
+    driver: bridge
+
+# 볼륨 정의 (데이터 영속성용)
+volumes:
+  postgres_data:  # PostgreSQL 데이터를 영구 저장

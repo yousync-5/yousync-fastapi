@@ -126,7 +126,7 @@ def read_movies_by_category(
     특정 카테고리의 영화들을 조회합니다.
     
     - **category**: 조회할 카테고리명
-    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **skip**: 건너뛸 항목 수 (기본값: 0) 
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
     movies = db.query(Movie).filter(

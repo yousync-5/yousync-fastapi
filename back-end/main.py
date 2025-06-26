@@ -41,7 +41,8 @@ app = FastAPI(
 # CORS 미들웨어 설정 - 프론트엔드에서 API 호출을 허용하기 위함
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # 모든 도메인에서의 접근 허용 (프로덕션에서는 특정 도메인만 허용하는 것이 보안상 좋음)
+    # 모든 도메인에서의 접근 허용 (프로덕션에서는 특정 도메인만 허용하는 것이 보안상 좋음)
+    allow_origins=["*"],
     allow_credentials=True,     # 쿠키/인증 정보 포함한 요청 허용
     allow_methods=["*"],        # 모든 HTTP 메서드 허용 (GET, POST, PUT, DELETE 등)
     allow_headers=["*"],        # 모든 헤더 허용
@@ -50,6 +51,7 @@ app.add_middleware(
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
 app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
 app.include_router(movie_router)   # /movies 경로로 영화 관련 API 등록
+
 
 # 루트 엔드포인트 - API 서버 상태 확인용
 @app.get("/")
@@ -65,6 +67,7 @@ def read_root():
         "version": "1.0.0"
     }
 
+
 # Health Check 엔드포인트 - 서버 상태 모니터링용
 @app.get("/health")
 def health_check():
@@ -73,3 +76,4 @@ def health_check():
     로드밸런서나 모니터링 도구에서 서버 상태를 확인할 때 사용합니다.
     """
     return {"status": "healthy", "service": "movie-script-api"}
+

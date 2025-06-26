@@ -9,14 +9,45 @@ load_dotenv()
 
 # PostgreSQL 데이터베이스 연결 설정
 # 환경변수 DATABASE_URL이 있으면 사용, 없으면 기본값 사용
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://jeonghwan@localhost:5432/fastapi_db")
+# Docker 환경과 로컬 환경을 모두 지원
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://jeonghwan@localhost:5432/fastapi_db"
+)
+
+# Docker 환경에서 개별 환경변수로 DATABASE_URL 구성
+if not os.getenv("DATABASE_URL"):
+    db_user = os.getenv("POSTGRES_USER", "jeonghwan")
+    db_password = os.getenv("POSTGRES_PASSWORD", "")
+    db_host = os.getenv("POSTGRES_HOST", "localhost")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB", "fastapi_db")
+    
+    if db_password:
+        DATABASE_URL = (
+            f"postgresql://{db_user}:{db_password}@{db_host}:"
+            f"{db_port}/{db_name}"
+        )
+    else:
+        DATABASE_URL = f"postgresql://{db_user}@{db_host}:{db_port}/{db_name}"
+
+# 데이터베이스 연결 URL 출력 (비밀번호 마스킹)
+if os.getenv('POSTGRES_PASSWORD'):
+    masked_url = DATABASE_URL.replace(os.getenv('POSTGRES_PASSWORD'), '***')
+    print(f"데이터베이스 연결 URL: {masked_url}")
+else:
+    print(f"데이터베이스 연결 URL: {DATABASE_URL}")
+
 # SQLite를 사용하려면 다음 줄의 주석을 해제하세요:
 # DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
 # SQLAlchemy 데이터베이스 엔진 생성
 # SQLite 사용시에는 멀티스레딩 제약을 해제하는 옵션이 필요
 if "sqlite" in DATABASE_URL:
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
 else:
     engine = create_engine(DATABASE_URL)  # PostgreSQL은 별도 옵션 불필요
 
@@ -27,6 +58,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # ORM 모델들이 상속받을 베이스 클래스 생성
 Base = declarative_base()
+
 
 # FastAPI의 의존성 주입에서 사용할 데이터베이스 세션 함수
 # 요청마다 새로운 세션을 생성하고, 요청 완료 후 자동으로 세션 닫기
