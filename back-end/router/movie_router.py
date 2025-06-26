@@ -96,28 +96,40 @@ def delete_movie(movie_id: int, db: Session = Depends(get_db)):
     db.commit()  # 변경사항 저장
     return {"detail": "Movie deleted successfully"}
 
-# 장르별 영화 조회 API - 특정 장르의 영화들만 가져오기
-@router.get("/genre/{genre}", response_model=List[MovieSchema])
-def read_movies_by_genre(genre: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+# 카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
+@router.get("/category/{category}", response_model=List[MovieSchema])
+def read_movies_by_category(category: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
-    특정 장르의 영화들을 조회합니다.
+    특정 카테고리의 영화들을 조회합니다.
     
-    - **genre**: 조회할 장르명
+    - **category**: 조회할 카테고리명
     - **skip**: 건너뛸 항목 수 (기본값: 0) 
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
-    movies = db.query(Movie).filter(Movie.genre.ilike(f"%{genre}%")).offset(skip).limit(limit).all()
+    movies = db.query(Movie).filter(Movie.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
     return movies
 
 # 감독별 영화 조회 API - 특정 감독의 영화들만 가져오기
-@router.get("/director/{director}", response_model=List[MovieSchema])
-def read_movies_by_director(director: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """
-    특정 감독의 영화들을 조회합니다.
+# @router.get("/director/{director}", response_model=List[MovieSchema])
+# def read_movies_by_director(director: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+#     """
+#     특정 감독의 영화들을 조회합니다.
     
-    - **director**: 조회할 감독명
+#     - **director**: 조회할 감독명
+#     - **skip**: 건너뛸 항목 수 (기본값: 0)
+#     - **limit**: 가져올 최대 항목 수 (기본값: 100)
+#     """
+#     movies = db.query(Movie).filter(Movie.director.ilike(f"%{director}%")).offset(skip).limit(limit).all()
+#     return movies
+
+
+@router.get("/actor/{actor}", response_model=List[MovieSchema])
+def read_movies_by_actor(actor: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    특정 배우의 영화들을 조회한다.
+    - **actor**: 조회할 감독명
     - **skip**: 건너뛸 항목 수 (기본값: 0)
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
-    movies = db.query(Movie).filter(Movie.director.ilike(f"%{director}%")).offset(skip).limit(limit).all()
+    movies = db.query(Movie).filter(Movie.actor.ilike(f"%{actor}")).offset(skip).limit(limit).all()
     return movies
