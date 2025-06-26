@@ -36,6 +36,7 @@ pytest_cache/
 # 환경 변수
 .env
 .env.*
+!.env.example
 
 # Database / Alembic
 *.sqlite3

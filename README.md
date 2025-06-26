@@ -20,10 +20,10 @@ docker-compose up -d
 ```
 
 ### 사전 준비사항
-- [Docker](https://www.docker.com/get-started) 설치
-- [Docker Compose](https://docs.docker.com/compose/install/) 설치
+- [Docker Desktop](https://www.docker.com/get-started) 설치 및 실행
+- Git 설치
 
-### 1단계: 저장소 클론
+### 1단계: 프로젝트 클론
 ```bash
 git clone <repository-url>
 cd fast-api
@@ -31,16 +31,19 @@ cd fast-api
 
 ### 2단계: 환경변수 설정
 ```bash
-# 환경변수 파일 복사
-cp .env.docker .env
+# 환경변수 예시 파일을 복사하여 실제 환경변수 파일 생성
+cp .env.example .env
 ```
 
-### 3단계: 서비스 시작
+### 3단계: Docker 컨테이너 시작
 ```bash
 # 모든 서비스 시작 (백그라운드)
 docker-compose up -d
 
-# 로그 확인
+# 시작 상태 확인
+docker-compose ps
+
+# 로그 확인 (선택사항)
 docker-compose logs -f
 ```
 
