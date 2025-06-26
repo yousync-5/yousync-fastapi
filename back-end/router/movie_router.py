@@ -1,0 +1,123 @@
+# 영화 관련 API 엔드포인트들을 관리하는 라우터
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+# 데이터베이스 관련 임포트
+from database import get_db
+from models import Movie
+from schemas import Movie as MovieSchema, MovieCreate
+
+# APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
+router = APIRouter(
+    prefix="/movies",   # 모든 경로 앞에 /movies가 자동으로 붙음
+    tags=["movies"]     # OpenAPI 문서에서 이 그룹의 태그명
+)
+
+# 영화 생성 API - POST 요청으로 새로운 영화 데이터를 받아 데이터베이스에 저장
+@router.post("/", response_model=MovieSchema)
+def create_movie(movie: MovieCreate, db: Session = Depends(get_db)):
+    """
+    새로운 영화를 생성합니다.
+    
+    - **title**: 영화 제목 (필수)
+    - **director**: 감독 이름 (필수)
+    - **release_year**: 개봉연도 (필수)
+    - **genre**: 장르 (필수)
+    """
+    db_movie = Movie(**movie.dict())  # Pydantic 모델을 SQLAlchemy 모델로 변환
+    db.add(db_movie)  # 데이터베이스 세션에 추가
+    db.commit()  # 변경사항 커밋 (실제 DB에 저장)
+    db.refresh(db_movie)  # 저장된 데이터를 다시 불러와서 ID 등 업데이트
+    return db_movie
+
+# 모든 영화 조회 API - 페이지네이션 지원
+@router.get("/", response_model=List[MovieSchema])
+def read_movies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    모든 영화 목록을 조회합니다.
+    
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    movies = db.query(Movie).offset(skip).limit(limit).all()  # SQL: SELECT * FROM movies LIMIT 100 OFFSET 0
+    return movies
+
+# 특정 영화 조회 API - ID로 하나의 영화만 가져오기
+@router.get("/{movie_id}", response_model=MovieSchema)
+def read_movie(movie_id: int, db: Session = Depends(get_db)):
+    """
+    특정 ID의 영화를 조회합니다.
+    
+    - **movie_id**: 조회할 영화의 ID
+    """
+    movie = db.query(Movie).filter(Movie.id == movie_id).first()  # SQL: SELECT * FROM movies WHERE id = movie_id
+    if movie is None:  # 해당 ID의 영화가 없으면 404 에러 반환
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie
+
+# 영화 수정 API - PUT 요청으로 기존 영화 데이터를 업데이트
+@router.put("/{movie_id}", response_model=MovieSchema)
+def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db)):
+    """
+    기존 영화를 수정합니다.
+    
+    - **movie_id**: 수정할 영화의 ID
+    - **title**: 수정할 영화 제목
+    - **director**: 수정할 감독 이름
+    - **release_year**: 수정할 개봉연도
+    - **genre**: 수정할 장르
+    """
+    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if db_movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    
+    # 기존 영화 데이터를 새로운 데이터로 업데이트
+    for field, value in movie.dict().items():
+        setattr(db_movie, field, value)
+    
+    db.commit()  # 변경사항 저장
+    db.refresh(db_movie)  # 업데이트된 데이터 다시 로드
+    return db_movie
+
+# 영화 삭제 API - DELETE 요청으로 특정 영화를 삭제
+@router.delete("/{movie_id}")
+def delete_movie(movie_id: int, db: Session = Depends(get_db)):
+    """
+    특정 ID의 영화를 삭제합니다.
+    
+    - **movie_id**: 삭제할 영화의 ID
+    """
+    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if db_movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    
+    db.delete(db_movie)  # 데이터베이스에서 삭제
+    db.commit()  # 변경사항 저장
+    return {"detail": "Movie deleted successfully"}
+
+# 장르별 영화 조회 API - 특정 장르의 영화들만 가져오기
+@router.get("/genre/{genre}", response_model=List[MovieSchema])
+def read_movies_by_genre(genre: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    특정 장르의 영화들을 조회합니다.
+    
+    - **genre**: 조회할 장르명
+    - **skip**: 건너뛸 항목 수 (기본값: 0) 
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    movies = db.query(Movie).filter(Movie.genre.ilike(f"%{genre}%")).offset(skip).limit(limit).all()
+    return movies
+
+# 감독별 영화 조회 API - 특정 감독의 영화들만 가져오기
+@router.get("/director/{director}", response_model=List[MovieSchema])
+def read_movies_by_director(director: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    특정 감독의 영화들을 조회합니다.
+    
+    - **director**: 조회할 감독명
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    movies = db.query(Movie).filter(Movie.director.ilike(f"%{director}%")).offset(skip).limit(limit).all()
+    return movies
