@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 
 class Movie(Base):
@@ -11,6 +12,7 @@ class Movie(Base):
     youtube_url = Column(String, unique=True, nullable=False)
     total_time = Column(Integer)
     bookmark = Column(Boolean, default=False)
+    full_background_audio_url = Column(String)  # 전체 배경음 (더빙 합성용)
     
     # 관계
     scripts = relationship("Script", back_populates="movie", cascade="all, delete")
@@ -36,7 +38,9 @@ class Script(Base):
     translation = Column(Text)
     url = Column(String)
     actor_pitch_values = Column(JSON)
-    background_audio_url = Column(String)
+    background_audio_url = Column(String)  # 구간별 배경음 (분석용)
+    user_voice_url = Column(String)  # 사용자 더빙 음성
+    user_voice_uploaded_at = Column(DateTime, default=func.now())  # 더빙 업로드 시간
     
     # 관계
     movie = relationship("Movie", back_populates="scripts")
