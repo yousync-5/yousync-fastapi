@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 
 # === Actor Schemas ===
 class ActorBase(BaseModel):
@@ -25,6 +26,8 @@ class ScriptBase(BaseModel):
     url: Optional[str] = None
     actor_pitch_values: Optional[List[int]] = None
     background_audio_url: Optional[str] = None
+    user_voice_url: Optional[str] = None
+    user_voice_uploaded_at: Optional[datetime] = None
 
 class ScriptCreate(ScriptBase):
     pass
@@ -43,6 +46,7 @@ class MovieBase(BaseModel):
     youtube_url: str
     total_time: Optional[int] = None
     bookmark: bool = False
+    full_background_audio_url: Optional[str] = None
 
 class MovieCreate(MovieBase):
     pass
