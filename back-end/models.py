@@ -12,7 +12,7 @@ class Movie(Base):
     youtube_url = Column(String, unique=True, nullable=False)
     total_time = Column(Integer)
     bookmark = Column(Boolean, default=False)
-    full_background_audio_url = Column(String)  # 전체 배경음 (더빙 합성용)
+    full_background_audio_url = Column(String, nullable=True)  # 전체 배경음 (더빙 합성용)
     
     # 관계
     scripts = relationship("Script", back_populates="movie", cascade="all, delete")
