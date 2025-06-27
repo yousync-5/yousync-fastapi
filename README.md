@@ -274,11 +274,12 @@ FastAPI는 자동으로 대화형 API 문서를 생성합니다:
 ```sql
 CREATE TABLE movies (
     id SERIAL PRIMARY KEY,
-    title VARCHAR NOT NULL,          -- 영화 제목
-    category VARCHAR,                -- 카테고리/장르
-    youtube_url VARCHAR UNIQUE NOT NULL, -- YouTube URL
-    total_time INTEGER,              -- 재생시간(분)
-    bookmark BOOLEAN DEFAULT FALSE
+    title VARCHAR NOT NULL,                   -- 영화 제목
+    category VARCHAR,                         -- 카테고리/장르
+    youtube_url VARCHAR UNIQUE NOT NULL,      -- YouTube URL (음소거 재생용)
+    total_time INTEGER,                       -- 재생시간(분)
+    bookmark BOOLEAN DEFAULT FALSE,
+    full_background_audio_url VARCHAR         -- 전체 배경음 (더빙 합성용)
 );
 ```
 
@@ -290,7 +291,7 @@ CREATE TABLE actors (
 );
 ```
 
-### 📝 Scripts 테이블 (구조 변경)
+### 📝 Scripts 테이블
 ```sql
 CREATE TABLE scripts (
     id SERIAL PRIMARY KEY,
@@ -302,7 +303,9 @@ CREATE TABLE scripts (
     translation TEXT,                        -- 대사 번역
     url VARCHAR,                             -- YouTube URL
     actor_pitch_values JSON,                 -- 배우 음성 피치 배열
-    background_audio_url VARCHAR,            -- S3 배경음 파일 URL
+    background_audio_url VARCHAR,            -- 구간별 배경음 (분석용)
+    user_voice_url VARCHAR,                  -- 사용자 더빙 음성
+    user_voice_uploaded_at TIMESTAMP,        -- 더빙 업로드 시간
     FOREIGN KEY (movie_id) REFERENCES movies(id),
     FOREIGN KEY (actor_id) REFERENCES actors(id)
 );
@@ -334,6 +337,13 @@ CREATE TABLE users (
 - **Actor ↔ Script**: 일대다 (한 배우가 여러 대사)
 - **Movie ↔ Actor**: 다대다 (MovieActor 테이블을 통해 연결)
 
+### 🎬 더빙 시스템 아키텍처
+- **Movie.youtube_url**: 원본 영상 (프론트에서 음소거 재생)
+- **Movie.full_background_audio_url**: 전체 배경음 (더빙 합성용)
+- **Script.background_audio_url**: 구간별 배경음 (분석용)
+- **Script.user_voice_url**: 사용자 더빙 음성
+- **최종 재생**: 유튜브 영상(음소거) + 배경음 + 사용자 음성 = 완성된 더빙작품
+
 ## 💡 사용 예시
 
 ### 영화 생성
@@ -345,6 +355,7 @@ curl -X POST "http://localhost:8000/movies/" \
     "category": "드라마",
     "youtube_url": "https://youtube.com/watch?v=example",
     "total_time": 132,
+    "full_background_audio_url": "https://s3.amazonaws.com/bucket/parasite_full_bgm.mp3"
     "bookmark": false
   }'
 ```
@@ -371,7 +382,16 @@ curl -X POST "http://localhost:8000/scripts/" \
     "translation": "We live in a semi-basement",
     "url": "https://youtube.com/watch?v=example",
     "actor_pitch_values": [120, 125, 118, 130, 115],
-    "background_audio_url": "https://s3.amazonaws.com/bucket/audio/background_1.mp3"
+    "background_audio_url": "https://s3.amazonaws.com/bucket/segment_15-18_bg.mp3"
+  }'
+```
+
+### 사용자 더빙 음성 업로드
+```bash
+curl -X PUT "http://localhost:8000/scripts/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_voice_url": "https://s3.amazonaws.com/bucket/user123_script1.mp3"
   }'
 ```
 
@@ -602,9 +622,29 @@ GET /scripts/movie/1  # 영화별 분석된 스크립트 조회
 - **명확한 구조**: 30개 API 엔드포인트가 정리된 4개 라우터로 체계화
 - **일관성 확보**: 모든 파일이 TMDb 제거된 최신 상태로 통일
 
-#### 🎯 최종 프로젝트 상태
+### 🎤 더빙 시스템 아키텍처 구축 완료 (2024.06.28)
+
+#### ✅ 데이터베이스 스키마 확장
+- **Movie 테이블**: `full_background_audio_url` 필드 추가 (전체 배경음 저장)
+- **Script 테이블**: `user_voice_url`, `user_voice_uploaded_at` 필드 추가 (사용자 더빙 음성)
+- **이중 배경음 구조**: 구간별 분석용 + 전체 합성용으로 효율적 분리
+
+#### � 혁신적인 더빙 재생 방식
+- **프론트엔드 처리**: 유튜브 영상(음소거) + 커스텀 오디오 트랙 동시 재생
+- **저장 공간 최적화**: 별도 영상 파일 불필요, 유튜브 원본 화질 유지
+- **실시간 합성**: 전체 배경음 + 사용자 더빙 음성의 동적 합성
+
+#### 🔄 시스템 플로우
 ```
-✅ models.py (정규화된 단일 모델 파일)
+1. 영상 분석 → 구간별/전체 배경음 추출
+2. 사용자 더빙 → 대사별 음성 녹음 및 저장  
+3. 최종 재생 → 유튜브 영상(음소거) + 합성 오디오
+4. 결과물 → 완성된 개인 더빙 작품
+```
+
+#### �🎯 최종 프로젝트 상태
+```
+✅ models.py (더빙 기능 포함 확장)
 ✅ 4개 라우터 (script, movie, actor, analysis)
 ✅ 4개 서비스 (youtube, crawl, face, whisper)
 ✅ 30개 API 엔드포인트 정상 작동
