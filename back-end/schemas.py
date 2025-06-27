@@ -26,8 +26,8 @@ class ScriptBase(BaseModel):
     url: Optional[str] = None
     actor_pitch_values: Optional[List[int]] = None
     background_audio_url: Optional[str] = None
-    user_voice_url: Optional[str] = None
-    user_voice_uploaded_at: Optional[datetime] = None
+    # user_voice_url: Optional[str] = None
+    # user_voice_uploaded_at: Optional[datetime] = None
 
 class ScriptCreate(ScriptBase):
     pass
