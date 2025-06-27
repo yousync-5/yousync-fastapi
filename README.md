@@ -46,13 +46,12 @@ FastAPI + PostgreSQL을 사용한 영화 및 스크립트 관리 시스템입니
 - **배경음 피치**: 배경음악/효과음의 피치 분석 데이터
 - **구간별 분석**: 대사 시작/끝 시간에 따른 정밀 분석
 
-### 🎥 YouTube 영상 분석 (신규 추가)
+### 🎥 YouTube 영상 분석
 - **메타데이터 추출**: 유튜브 영상 제목, 설명, 태그, 조회수 등 정보 추출
-- **배우 정보 조회**: TMDb API를 통한 영화 출연진 정보 자동 조회
 - **배우 이미지 크롤링**: 구글 이미지 검색을 통한 배우 사진 자동 수집
 - **얼굴 인식 및 매칭**: OpenCV와 face_recognition을 통한 영상 내 배우 얼굴 매칭
 - **음성 전사**: OpenAI Whisper를 통한 영상 음성의 텍스트 변환
-- **자동화된 분석 파이프라인**: 유튜브 링크 하나로 전체 분석 과정 자동화
+- **독립적인 분석 파이프라인**: 외부 API 의존성 없이 완전한 영상 분석
 
 ## 🛠️ 기술 스택
 
@@ -74,8 +73,7 @@ FastAPI + PostgreSQL을 사용한 영화 및 스크립트 관리 시스템입니
 - **FFmpeg**: 멀티미디어 처리
 
 ### 외부 API 연동
-- **TMDb API**: 영화 정보 및 출연진 데이터
-- **Google Custom Search API**: 배우 이미지 크롤링
+- **Google Custom Search API**: 배우 이미지 크롤링 (선택사항)
 
 ### Development Tools
 - **python-dotenv**: 환경변수 관리
@@ -90,14 +88,31 @@ fast-api/
 ├── back-end/
 │   ├── main.py                 # FastAPI 애플리케이션 진입점
 │   ├── database.py             # 데이터베이스 연결 설정
-│   ├── models.py               # SQLAlchemy ORM 모델
+│   ├── models.py               # SQLAlchemy ORM 모델 (정규화된 단일 파일)
 │   ├── schemas.py              # Pydantic 스키마 정의
 │   ├── requirements.txt        # Python 의존성 패키지
 │   ├── .env                    # 환경변수 설정 파일
+│   ├── .gitignore             # Git 무시 파일
+│   ├── init_db.py             # 데이터베이스 초기화 스크립트
 │   ├── add_dummy_data.py       # 테스트 데이터 생성 스크립트
-│   ├── router/
+│   ├── db.vuerd.json          # ERD 설계 파일
+│   ├── router/                # API 라우터 모듈
 │   │   ├── __init__.py
-│   │   ├── script_router.py    # 스크립트 관련 API 엔드포인트
+│   │   ├── script_router.py    # 스크립트 관련 API
+│   │   ├── movie_router.py     # 영화 관련 API
+│   │   ├── actor_router.py     # 배우 관련 API
+│   │   └── analysis_router.py  # 영상 분석 API (TMDb 의존성 제거)
+│   ├── services/              # 비즈니스 로직 서비스
+│   │   ├── __init__.py
+│   │   ├── youtube_service.py  # 유튜브 메타데이터 추출
+│   │   ├── crawl_service.py    # 배우 이미지 크롤링
+│   │   ├── face_service.py     # 얼굴 인식 및 매칭
+│   │   └── whisper_service.py  # 음성 전사
+│   ├── storage/               # 파일 저장소
+│   │   ├── actor_encodings/   # 배우 얼굴 인코딩 파일
+│   │   ├── scene_frames/      # 영상 프레임 이미지
+│   │   └── audio/             # 추출된 오디오 파일
+│   └── venv/                  # Python 가상환경
 │   │   ├── movie_router.py     # 영화 관련 API 엔드포인트
 │   │   └── analysis_router.py  # 영상 분석 관련 API 엔드포인트 (신규)
 │   ├── services/               # 비즈니스 로직 서비스 (신규)
@@ -155,23 +170,26 @@ DATABASE_URL=postgresql+psycopg2://username:password@host:port/database
 # 또는 SQLite 설정 (로컬 개발)
 DATABASE_URL=sqlite:///./test.db
 
-# 영상 분석 API 키들 (신규 추가)
-TMDB_API_KEY=your_tmdb_api_key_here
+# 배우 이미지 크롤링 API 키 (선택사항)
 GOOGLE_API_KEY=your_google_custom_search_api_key_here
 GOOGLE_CX=your_google_custom_search_engine_id_here
 ```
 
-**API 키 발급 방법:**
-- **TMDb API**: https://www.themoviedb.org/settings/api 에서 발급
+**API 키 발급 방법 (선택사항):**
 - **Google Custom Search API**: Google Cloud Console에서 Custom Search API 활성화
 - **Google Custom Search Engine**: https://cse.google.com/ 에서 검색 엔진 생성
+- **참고**: API 키 없이도 기본 영상 분석 기능은 모두 사용 가능합니다.
 
 ### 6. 데이터베이스 초기화
 ```bash
-# 애플리케이션 실행 시 자동으로 테이블이 생성됩니다
-# 또는 테스트 데이터 추가
+# 수동으로 데이터베이스 초기화 (선택사항)
+python init_db.py
+
+# 테스트 데이터 추가 (선택사항)
 python add_dummy_data.py
 ```
+
+**참고**: 애플리케이션 실행 시 자동으로 테이블이 생성됩니다.
 
 ### 7. 서버 실행
 
@@ -571,6 +589,28 @@ GET /scripts/movie/1  # 영화별 분석된 스크립트 조회
 ```
 
 모든 변경사항이 성공적으로 완료되어 **안정적이고 확장 가능한 영상 분석 플랫폼**이 구축되었습니다! 🎉
+
+### 🧹 프로젝트 파일 정리 완료 (2024.06.27)
+
+#### ✅ 중복 파일 제거
+- **Models**: `models_new.py`, `models_backup.py` 삭제 → `models.py` 단일 파일 유지
+- **Routers**: `analysis_router_new.py`, `script_router_backup.py`, `script_router_new.py` 삭제
+- **캐시 파일**: 모든 `__pycache__/` 디렉토리 정리
+
+#### 📝 개발 환경 개선
+- **`.gitignore` 생성**: Python, 환경변수, 임시파일, 저장소 파일 무시 설정
+- **명확한 구조**: 30개 API 엔드포인트가 정리된 4개 라우터로 체계화
+- **일관성 확보**: 모든 파일이 TMDb 제거된 최신 상태로 통일
+
+#### 🎯 최종 프로젝트 상태
+```
+✅ models.py (정규화된 단일 모델 파일)
+✅ 4개 라우터 (script, movie, actor, analysis)
+✅ 4개 서비스 (youtube, crawl, face, whisper)
+✅ 30개 API 엔드포인트 정상 작동
+✅ TMDb 의존성 완전 제거
+✅ .gitignore로 깔끔한 Git 관리
+```
 
 ## 🤝 기여하기
 
