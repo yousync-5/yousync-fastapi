@@ -35,12 +35,12 @@ class Script(Base):
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     script = Column(Text, nullable=False)
-    translation = Column(Text)
-    url = Column(String)
-    actor_pitch_values = Column(JSON)
-    background_audio_url = Column(String)  # 구간별 배경음 (분석용)
-    user_voice_url = Column(String)  # 사용자 더빙 음성
-    user_voice_uploaded_at = Column(DateTime, default=func.now())  # 더빙 업로드 시간
+    translation = Column(Text, nullable=False)
+    # url = Column(String)
+    actor_pitch_values = Column(JSON, nullable=True)
+    background_audio_url = Column(String, nullable=True)   # 구간별 배경음 (분석용)
+    # user_voice_url = Column(String, nullable=True)         # 사용자 더빙 음성
+    # user_voice_uploaded_at = Column(DateTime, default=func.now(), nullable=True)  # 더빙 업로드 시간
     
     # 관계
     movie = relationship("Movie", back_populates="scripts")
