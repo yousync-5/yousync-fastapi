@@ -5,7 +5,7 @@ from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
-from models import Movie
+from models import Movie, Actor, MovieActor
 from schemas import Movie as MovieSchema, MovieCreate
 
 # APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
@@ -21,9 +21,10 @@ def create_movie(movie: MovieCreate, db: Session = Depends(get_db)):
     새로운 영화를 생성합니다.
     
     - **title**: 영화 제목 (필수)
-    - **director**: 감독 이름 (필수)
-    - **release_year**: 개봉연도 (필수)
-    - **genre**: 장르 (필수)
+    - **director**: 감독 이름
+    - **release_year**: 개봉연도
+    - **category**: 장르
+    - **youtube_url**: 유튜브 URL (필수)
     """
     db_movie = Movie(**movie.dict())  # Pydantic 모델을 SQLAlchemy 모델로 변환
     db.add(db_movie)  # 데이터베이스 세션에 추가
@@ -66,7 +67,7 @@ def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db
     - **title**: 수정할 영화 제목
     - **director**: 수정할 감독 이름
     - **release_year**: 수정할 개봉연도
-    - **genre**: 수정할 장르
+    - **category**: 수정할 장르
     """
     db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if db_movie is None:
@@ -109,27 +110,21 @@ def read_movies_by_category(category: str, skip: int = 0, limit: int = 100, db: 
     movies = db.query(Movie).filter(Movie.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
     return movies
 
-# 감독별 영화 조회 API - 특정 감독의 영화들만 가져오기
-# @router.get("/director/{director}", response_model=List[MovieSchema])
-# def read_movies_by_director(director: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-#     """
-#     특정 감독의 영화들을 조회합니다.
-    
-#     - **director**: 조회할 감독명
-#     - **skip**: 건너뛸 항목 수 (기본값: 0)
-#     - **limit**: 가져올 최대 항목 수 (기본값: 100)
-#     """
-#     movies = db.query(Movie).filter(Movie.director.ilike(f"%{director}%")).offset(skip).limit(limit).all()
-#     return movies
-
-
-@router.get("/actor/{actor}", response_model=List[MovieSchema])
-def read_movies_by_actor(actor: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+# 배우별 영화 조회 API - MovieActor 관계 테이블을 통해 조회
+@router.get("/actor/{actor_name}", response_model=List[MovieSchema])
+def read_movies_by_actor(actor_name: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
-    특정 배우의 영화들을 조회한다.
-    - **actor**: 조회할 감독명
+    특정 배우가 출연한 영화들을 조회합니다.
+    
+    - **actor_name**: 조회할 배우명
     - **skip**: 건너뛸 항목 수 (기본값: 0)
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
-    movies = db.query(Movie).filter(Movie.actor.ilike(f"%{actor}")).offset(skip).limit(limit).all()
+    # Actor 테이블에서 배우 찾기
+    actor = db.query(Actor).filter(Actor.name.ilike(f"%{actor_name}%")).first()
+    if not actor:
+        return []
+    
+    # MovieActor 관계 테이블을 통해 영화 조회
+    movies = db.query(Movie).join(MovieActor).filter(MovieActor.actor_id == actor.id).offset(skip).limit(limit).all()
     return movies

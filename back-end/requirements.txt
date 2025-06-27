@@ -12,3 +12,20 @@ psycopg2-binary==2.9.10   # PostgreSQL adapter for Python
 # 환경설정 및 유틸리티
 python-dotenv==1.1.1      # .env 파일에서 환경변수 로드
 python-multipart==0.0.20  # multipart/form-data 파싱을 위한 라이브러리
+
+# 영상/음성 분석 관련
+yt-dlp==2024.11.4          # 유튜브 다운로더
+pytube==15.0.0             # 유튜브 메타데이터 추출
+whisper-timestamped==1.15.8  # Whisper 자막 생성
+torch>=2.0.0               # PyTorch (Whisper 의존성)
+
+# 영화 데이터베이스 API
+tmdbv3api==1.9.0           # The Movie Database API
+
+# 얼굴 인식 및 이미지 처리
+face-recognition==1.3.0    # 얼굴 인식 라이브러리
+numpy>=1.21.0              # 수치 계산
+Pillow>=8.0.0              # 이미지 처리
+
+# 웹 크롤링
+icrawler==0.6.6            # 이미지 크롤링

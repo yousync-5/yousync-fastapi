@@ -1,32 +1,61 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, JSON  # SQLAlchemy 데이터 타입들
-from sqlalchemy.sql import func  # 데이터베이스 함수들 (현재 시간 등)
-from database import Base  # 데이터베이스 베이스 클래스
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
+from database import Base
 
-# 스크립트 테이블 모델 - 영화/드라마 대사 정보를 저장
-class Script(Base):
-    __tablename__ = "scripts"  # 실제 데이터베이스 테이블 이름
-    
-    id = Column(Integer, primary_key=True, index=True)  # 기본키, 자동증가
-    actor = Column(String, index=True)  # 배우 이름 (검색용 인덱스 생성)
-    start_time = Column(Float)  # 대사 시작 시간 (초 단위, 소수점 허용)
-    end_time = Column(Float)  # 대사 끝 시간 (초 단위, 소수점 허용)
-    script = Column(Text)  # 대사 원문 (긴 텍스트 저장 가능)
-    translation = Column(Text)  # 대사 번역문 (긴 텍스트 저장 가능)
-    url = Column(String)  # 유튜브 영상 URL
-    actor_pitch_values = Column(JSON)  # 배우 음성 피치 값들을 JSON 배열로 저장
-    background_pitch_values = Column(JSON)  # 배경음 피치 값들을 JSON 배열로 저장
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 생성 시간 (자동 설정)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())  # 수정 시간 (자동 업데이트)
-
-# 영화 테이블 모델 - 영화 기본 정보를 저장
 class Movie(Base):
-    __tablename__ = "movies"  # 실제 데이터베이스 테이블 이름
+    __tablename__ = "movies"
     
-    id = Column(Integer, primary_key=True, index=True)  # 기본키, 자동증가
-    actor = Column(String, index=True)  # 주연배우 이름 (검색용 인덱스 생성)
-    total_time = Column(Integer)  # 영화 총 재생시간 (분 단위)
-    category = Column(String, index=True)  # 영화 카테고리 (로맨스, 액션 등, 검색용 인덱스)
-    url = Column(String)  # 유튜브 영상 URL
-    bookmark = Column(Boolean, default=False)  # 북마크 여부 (기본값: False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())  # 생성 시간 (자동 설정)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())  # 수정 시간 (자동 업데이트)
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False, index=True)
+    director = Column(String)
+    release_year = Column(Integer)
+    category = Column(String, index=True)
+    youtube_url = Column(String, unique=True, nullable=False)
+    total_time = Column(Integer)
+    bookmark = Column(Boolean, default=False)
+    
+    # 관계
+    scripts = relationship("Script", back_populates="movie", cascade="all, delete")
+
+class Actor(Base):
+    __tablename__ = "actors"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    tmdb_id = Column(Integer, unique=True, nullable=True)
+    
+    # 관계
+    scripts = relationship("Script", back_populates="actor")
+
+class Script(Base):
+    __tablename__ = "scripts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
+    actor_id = Column(Integer, ForeignKey("actors.id"), nullable=False)
+    start_time = Column(Float, nullable=False)
+    end_time = Column(Float, nullable=False)
+    script = Column(Text, nullable=False)
+    translation = Column(Text)
+    url = Column(String)
+    actor_pitch_values = Column(JSON)
+    background_audio_url = Column(String)
+    
+    # 관계
+    movie = relationship("Movie", back_populates="scripts")
+    actor = relationship("Actor", back_populates="scripts")
+
+class MovieActor(Base):
+    __tablename__ = "movie_actors"
+    
+    movie_id = Column(Integer, ForeignKey("movies.id"), primary_key=True)
+    actor_id = Column(Integer, ForeignKey("actors.id"), primary_key=True)
+    character_name = Column(String)  # 극중 역할명
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
