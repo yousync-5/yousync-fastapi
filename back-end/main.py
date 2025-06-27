@@ -25,6 +25,8 @@ from models import Base
 # 라우터 임포트 - 각 도메인별로 분리된 API 엔드포인트들
 from router.script_router import router as script_router
 from router.movie_router import router as movie_router
+from router.actor_router import router as actor_router
+from router.analysis_router import router as analysis_router
 
 # 데이터베이스 테이블 생성 (앱 시작시 자동으로 테이블이 생성됨)
 Base.metadata.create_all(bind=engine)
@@ -50,6 +52,8 @@ app.add_middleware(
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
 app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
 app.include_router(movie_router)   # /movies 경로로 영화 관련 API 등록
+app.include_router(actor_router)   # /actors 경로로 배우 관련 API 등록
+app.include_router(analysis_router)  # /analysis 경로로 영상 분석 관련 API 등록
 
 # 루트 엔드포인트 - API 서버 상태 확인용
 @app.get("/")
