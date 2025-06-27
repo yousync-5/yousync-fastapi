@@ -7,8 +7,6 @@ class Movie(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False, index=True)
-    director = Column(String)
-    release_year = Column(Integer)
     category = Column(String, index=True)
     youtube_url = Column(String, unique=True, nullable=False)
     total_time = Column(Integer)
@@ -22,7 +20,6 @@ class Actor(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
-    tmdb_id = Column(Integer, unique=True, nullable=True)
     
     # 관계
     scripts = relationship("Script", back_populates="actor")
@@ -50,7 +47,6 @@ class MovieActor(Base):
     
     movie_id = Column(Integer, ForeignKey("movies.id"), primary_key=True)
     actor_id = Column(Integer, ForeignKey("actors.id"), primary_key=True)
-    character_name = Column(String)  # 극중 역할명
 
 class User(Base):
     __tablename__ = "users"

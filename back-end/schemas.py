@@ -4,7 +4,6 @@ from typing import Optional, List
 # === Actor Schemas ===
 class ActorBase(BaseModel):
     name: str
-    tmdb_id: Optional[int] = None
 
 class ActorCreate(ActorBase):
     pass
@@ -40,8 +39,6 @@ class Script(ScriptBase):
 # === Movie Schemas ===
 class MovieBase(BaseModel):
     title: str
-    director: Optional[str] = None
-    release_year: Optional[int] = None
     category: Optional[str] = None
     youtube_url: str
     total_time: Optional[int] = None
@@ -61,7 +58,6 @@ class Movie(MovieBase):
 class MovieActorBase(BaseModel):
     movie_id: int
     actor_id: int
-    character_name: Optional[str] = None
 
 class MovieActorCreate(MovieActorBase):
     pass

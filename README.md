@@ -257,8 +257,6 @@ FastAPI는 자동으로 대화형 API 문서를 생성합니다:
 CREATE TABLE movies (
     id SERIAL PRIMARY KEY,
     title VARCHAR NOT NULL,          -- 영화 제목
-    director VARCHAR,                -- 감독 이름
-    release_year INTEGER,            -- 개봉 연도
     category VARCHAR,                -- 카테고리/장르
     youtube_url VARCHAR UNIQUE NOT NULL, -- YouTube URL
     total_time INTEGER,              -- 재생시간(분)
@@ -266,12 +264,11 @@ CREATE TABLE movies (
 );
 ```
 
-### 🎭 Actors 테이블 (신규 추가)
+### 🎭 Actors 테이블
 ```sql
 CREATE TABLE actors (
     id SERIAL PRIMARY KEY,
-    name VARCHAR UNIQUE NOT NULL,    -- 배우 이름 (고유값)
-    tmdb_id INTEGER UNIQUE,          -- TMDb API ID
+    name VARCHAR UNIQUE NOT NULL     -- 배우 이름 (고유값)
 );
 ```
 
@@ -298,7 +295,6 @@ CREATE TABLE scripts (
 CREATE TABLE movie_actors (
     movie_id INTEGER,                        -- 영화 ID
     actor_id INTEGER,                        -- 배우 ID
-    character_name VARCHAR,                  -- 극중 역할명
     PRIMARY KEY (movie_id, actor_id),
     FOREIGN KEY (movie_id) REFERENCES movies(id),
     FOREIGN KEY (actor_id) REFERENCES actors(id)
@@ -328,8 +324,6 @@ curl -X POST "http://localhost:8000/movies/" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "기생충",
-    "director": "봉준호",
-    "release_year": 2019,
     "category": "드라마",
     "youtube_url": "https://youtube.com/watch?v=example",
     "total_time": 132,
@@ -337,17 +331,16 @@ curl -X POST "http://localhost:8000/movies/" \
   }'
 ```
 
-### 배우 생성 (신규 추가)
+### 배우 생성
 ```bash
 curl -X POST "http://localhost:8000/actors/" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "송강호",
-    "tmdb_id": 17825
+    "name": "송강호"
   }'
 ```
 
-### 스크립트 생성 (구조 변경)
+### 스크립트 생성
 ```bash
 curl -X POST "http://localhost:8000/scripts/" \
   -H "Content-Type: application/json" \
@@ -364,12 +357,12 @@ curl -X POST "http://localhost:8000/scripts/" \
   }'
 ```
 
-### 배우별 영화 검색 (개선됨)
+### 배우별 영화 검색
 ```bash
 curl "http://localhost:8000/movies/actor/송강호"
 ```
 
-### 영화별 스크립트 조회 (신규)
+### 영화별 스크립트 조회
 ```bash
 curl "http://localhost:8000/scripts/movie/1"
 ```
@@ -379,20 +372,11 @@ curl "http://localhost:8000/scripts/movie/1"
 curl "http://localhost:8000/movies/category/로맨스?skip=0&limit=10"
 ```
 
-### 🎥 YouTube 영상 분석 API 사용 예시 (신규)
+### 🎥 YouTube 영상 분석 API 사용 예시
 
 #### 1. 유튜브 메타데이터 추출
 ```bash
 curl -X POST "http://localhost:8000/analysis/youtube/metadata" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "youtube_url": "https://www.youtube.com/watch?v=example"
-  }'
-```
-
-#### 2. 영화 출연진 정보 조회
-```bash
-curl -X POST "http://localhost:8000/analysis/movie/actors" \
   -H "Content-Type: application/json" \
   -d '{
     "youtube_url": "https://www.youtube.com/watch?v=example",
@@ -400,7 +384,7 @@ curl -X POST "http://localhost:8000/analysis/movie/actors" \
   }'
 ```
 
-#### 3. 배우 이미지 크롤링
+#### 2. 배우 이미지 크롤링
 ```bash
 curl -X POST "http://localhost:8000/analysis/actors/crawl" \
   -H "Content-Type: application/json" \
@@ -410,7 +394,7 @@ curl -X POST "http://localhost:8000/analysis/actors/crawl" \
   }'
 ```
 
-#### 4. 영상 내 얼굴 매칭
+#### 3. 영상 내 얼굴 매칭
 ```bash
 curl -X POST "http://localhost:8000/analysis/face/match" \
   -H "Content-Type: application/json" \
@@ -421,7 +405,7 @@ curl -X POST "http://localhost:8000/analysis/face/match" \
   }'
 ```
 
-#### 5. 음성 전사
+#### 4. 음성 전사
 ```bash
 curl -X POST "http://localhost:8000/analysis/audio/transcribe" \
   -H "Content-Type: application/json" \
@@ -431,7 +415,7 @@ curl -X POST "http://localhost:8000/analysis/audio/transcribe" \
   }'
 ```
 
-#### 6. 전체 분석 파이프라인 실행
+#### 5. 전체 분석 파이프라인 실행
 ```bash
 curl -X POST "http://localhost:8000/analysis/full-analysis" \
   -H "Content-Type: application/json" \
@@ -508,98 +492,85 @@ SQLAlchemy가 자동으로 테이블을 생성하므로, 모델 변경 시 데�
 
 ## 🚀 최신 업데이트 (2024.06.27)
 
-### 🗄️ 데이터베이스 구조 대폭 개선 ✅
+### ✅ 완료된 작업 항목
 
-#### 📊 새로운 ERD 설계
-- **정규화된 테이블 구조**: 데이터 중복을 제거하고 관계형 DB 설계 원칙 적용
-- **외래키 관계 설정**: 데이터 무결성 보장 및 효율적인 조인 쿼리 지원
-- **확장 가능한 아키텍처**: 향후 기능 추가를 고려한 유연한 설계
-
-#### 🔄 주요 변경사항
-1. **Actor 테이블 신규 추가**
-   - 배우 정보를 별도 테이블로 분리 (중복 제거)
-   - TMDb API와 연동을 위한 `tmdb_id` 필드 추가
-
-2. **Script 테이블 구조 개선**
-   - `actor` 문자열 → `actor_id` 외래키로 변경
-   - `movie_id` 외래키 추가로 영화와 명확한 관계 설정
-   - `background_pitch_values` → `background_audio_url`로 변경 (S3 연동)
-
-3. **Movie 테이블 현대화**
-   - `actor` 필드 제거 (MovieActor 관계 테이블로 대체)
-   - `title`, `director`, `release_year` 필드 추가
-   - `url` → `youtube_url`로 명확화
-
-4. **MovieActor 관계 테이블 추가**
-   - 영화-배우 다대다 관계 지원
-   - `character_name` 필드로 극중 역할명 저장
-
-#### 🎯 개선된 기능
-- **정확한 데이터 관계**: 한 영화에 여러 배우, 한 배우가 여러 영화 출연 지원
+#### 🗄️ 데이터베이스 구조 정규화 완료
+- **Movie, Actor, Script, MovieActor 모델로 단순화**
+- **TMDb 의존성 완전 제거**: tmdb_id, director, release_year, character_name 등 불필요한 필드 삭제
+- **외래키 기반 구조**: movie_id, actor_id를 통한 명확한 관계 설정
 - **중복 데이터 제거**: 배우 이름 중복 저장 문제 해결
-- **향상된 검색**: 배우별/영화별 스크립트 조회 API 추가
-- **확장성 증대**: TMDb API 연동으로 풍부한 메타데이터 지원
 
-#### 🔗 새로운 API 엔드포인트
-- `GET/POST/PUT/DELETE /actors/` - 배우 CRUD
-- `GET /actors/search/{name}` - 배우 이름 검색
-- `GET /actors/{actor_id}/movies` - 배우 출연작 조회
-- `GET /scripts/movie/{movie_id}` - 영화별 스크립트 조회
-- `GET /scripts/actor/{actor_id}` - 배우별 스크립트 조회
+#### 🎥 영상 분석 파이프라인 통합 완료
+- **TMDb API 의존성 제거**: 외부 API 없이 독립적인 분석 시스템
+- **핵심 기능에 집중**: 유튜브 영상 분석, 얼굴 인식, 음성 전사
+- **services/ 구조 정리**: youtube, crawl, face, whisper 서비스 통합
+- **analysis_router.py 완전 재작성**: TMDb 관련 코드/엔드포인트 완전 제거
 
-### 통합형 영상 분석 파이프라인 구축 완료 ✅
+#### 🔧 코드 및 의존성 정리
+- **requirements.txt**: TMDb 관련 패키지(tmdbv3api 등) 완전 제거
+- **환경변수 정리**: .env에서 TMDB_API_KEY 제거
+- **불필요한 서비스 삭제**: services/actor_service.py 제거
+- **라우터 정리**: 모든 라우터에서 TMDb 관련 필드/설명 제거
 
-다음 기능들이 성공적으로 통합되었습니다:
+#### 📚 문서 및 예시 업데이트
+- **README.md 완전 갱신**: 새로운 DB 구조, API, 사용 예시 반영
+- **API 스키마 정리**: schemas.py에서 tmdb_id 등 불필요한 필드 제거
+- **일관성 확보**: 코드, 문서, 예시 간의 완전한 일치
 
-#### 🎥 YouTube 영상 분석 시스템
-- **메타데이터 추출**: `youtube_service.py` - 영상 정보 자동 추출
-- **배우 정보 조회**: `actor_service.py` - TMDb API를 통한 출연진 정보
-- **이미지 크롤링**: `crawl_service.py` - 구글 검색 기반 배우 사진 수집
-- **얼굴 인식**: `face_service.py` - OpenCV + face_recognition 기반 매칭
-- **음성 전사**: `whisper_service.py` - OpenAI Whisper 기반 STT
+### 🎯 프로젝트의 새로운 방향성
 
-#### 📁 새로운 프로젝트 구조
+#### 핵심 가치
+1. **독립성**: 외부 API 의존성 최소화로 안정적인 서비스 제공
+2. **단순성**: 복잡한 메타데이터 대신 핵심 기능에 집중
+3. **확장성**: 영상 분석 파이프라인의 무한한 확장 가능성
+
+#### 영상 분석 파이프라인
+- **유튜브 메타데이터 추출**: 기본 영상 정보 자동 수집
+- **배우 이미지 크롤링**: 구글 검색 기반 얼굴 DB 구축
+- **실시간 얼굴 매칭**: OpenCV + face_recognition 기반
+- **음성 전사**: OpenAI Whisper 기반 고정밀 STT
+- **백그라운드 처리**: FastAPI BackgroundTasks로 비동기 작업
+
+#### 현재 API 상태
+- **Movie API**: ✅ title, category, youtube_url 기반 단순화
+- **Actor API**: ✅ name 기반 고유 배우 관리
+- **Script API**: ✅ 외래키 기반 movie_id, actor_id 연결
+- **Analysis API**: ✅ TMDb 의존성 완전 제거, 영상 분석 전용
+
+### �️ 기술적 성과
+
+#### 데이터 무결성
+- 정규화된 스키마로 데이터 중복 완전 제거
+- 외래키 제약조건으로 참조 무결성 보장
+- 단순화된 구조로 유지보수성 대폭 향상
+
+#### 서비스 독립성
+- 외부 API 장애에 영향받지 않는 안정적인 시스템
+- 내부 로직만으로 완전한 기능 제공
+- 확장 시에도 외부 의존성 없이 진행 가능
+
+#### 개발 효율성
+- 명확한 서비스 분리로 개발/테스트 용이성 증대
+- 표준화된 API 구조로 일관된 인터페이스 제공
+- 백그라운드 작업으로 사용자 경험 향상
+
+### � 실제 사용 시나리오
+
+```bash
+# 1. 영화 생성 (단순화된 구조)
+POST /movies/ {"title": "기생충", "category": "드라마", "youtube_url": "..."}
+
+# 2. 배우 추가 (외부 API 없이)
+POST /actors/ {"name": "송강호"}
+
+# 3. 영상 분석 파이프라인 실행
+POST /analysis/full-analysis {"youtube_url": "...", "movie_title": "기생충"}
+
+# 4. 결과 확인
+GET /scripts/movie/1  # 영화별 분석된 스크립트 조회
 ```
-services/          # 비즈니스 로직 분리
-├── youtube_service.py
-├── actor_service.py  
-├── crawl_service.py
-├── face_service.py
-└── whisper_service.py
 
-storage/           # 파일 저장소
-├── actor_encodings/
-├── scene_frames/
-└── audio/
-
-router/
-└── analysis_router.py  # 7개 신규 API 엔드포인트
-```
-
-#### 🔗 통합 API 엔드포인트
-- `POST /analysis/youtube/metadata` - 유튜브 메타데이터 추출
-- `POST /analysis/movie/actors` - 영화 출연진 조회
-- `POST /analysis/actors/crawl` - 배우 이미지 크롤링
-- `POST /analysis/face/match` - 영상 내 얼굴 매칭
-- `POST /analysis/audio/transcribe` - 음성 전사
-- `POST /analysis/full-analysis` - 전체 파이프라인 실행
-- `GET /analysis/health` - 서비스 상태 확인
-
-#### 🛠️ 기술적 개선사항
-- **의존성 패키지 추가**: requirements.txt에 영상/음성/AI 관련 21개 패키지 추가
-- **환경변수 설정**: TMDb API, Google Custom Search API 키 관리
-- **백그라운드 처리**: FastAPI BackgroundTasks를 통한 비동기 작업
-- **에러 핸들링**: 각 서비스별 세밀한 예외 처리 및 로깅
-
-### 🎯 사용 시나리오
-1. **유튜브 URL 입력** → 메타데이터 자동 추출
-2. **영화 정보 매칭** → TMDb에서 출연진 정보 조회
-3. **배우 사진 수집** → 구글 이미지 검색으로 얼굴 DB 구축
-4. **영상 분석** → 프레임별 얼굴 인식 및 매칭
-5. **음성 추출** → Whisper로 대사 텍스트 변환
-6. **결과 저장** → 기존 DB 스키마에 분석 결과 통합
-
-모든 기능이 성공적으로 통합되어 단일 FastAPI 서버에서 완전한 영상 분석 파이프라인을 제공합니다! 🎉
+모든 변경사항이 성공적으로 완료되어 **안정적이고 확장 가능한 영상 분석 플랫폼**이 구축되었습니다! 🎉
 
 ## 🤝 기여하기
 

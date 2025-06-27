@@ -21,7 +21,6 @@ def create_actor(actor: ActorCreate, db: Session = Depends(get_db)):
     새로운 배우를 생성합니다.
     
     - **name**: 배우 이름 (필수, 고유값)
-    - **tmdb_id**: TMDb API ID (선택사항)
     """
     # 같은 이름의 배우가 이미 있는지 확인
     existing_actor = db.query(Actor).filter(Actor.name == actor.name).first()
@@ -78,7 +77,6 @@ def update_actor(actor_id: int, actor: ActorCreate, db: Session = Depends(get_db
     
     - **actor_id**: 수정할 배우의 ID
     - **name**: 수정할 배우 이름
-    - **tmdb_id**: 수정할 TMDb ID
     """
     db_actor = db.query(Actor).filter(Actor.id == actor_id).first()
     if db_actor is None:

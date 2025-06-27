@@ -21,10 +21,9 @@ def create_movie(movie: MovieCreate, db: Session = Depends(get_db)):
     새로운 영화를 생성합니다.
     
     - **title**: 영화 제목 (필수)
-    - **director**: 감독 이름
-    - **release_year**: 개봉연도
     - **category**: 장르
     - **youtube_url**: 유튜브 URL (필수)
+    - **total_time**: 재생시간(분)
     """
     db_movie = Movie(**movie.dict())  # Pydantic 모델을 SQLAlchemy 모델로 변환
     db.add(db_movie)  # 데이터베이스 세션에 추가
@@ -65,9 +64,8 @@ def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db
     
     - **movie_id**: 수정할 영화의 ID
     - **title**: 수정할 영화 제목
-    - **director**: 수정할 감독 이름
-    - **release_year**: 수정할 개봉연도
     - **category**: 수정할 장르
+    - **youtube_url**: 수정할 유튜브 URL
     """
     db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if db_movie is None:
