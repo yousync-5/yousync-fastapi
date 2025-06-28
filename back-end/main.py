@@ -17,6 +17,7 @@ API 문서 접근:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # 데이터베이스 관련 임포트
 from database import engine
@@ -39,6 +40,9 @@ app = FastAPI(
     docs_url="/docs",      # Swagger UI 경로
     redoc_url="/redoc"     # ReDoc 경로
 )
+
+#정적 파일 mount
+app.mount("/media", StaticFiles(directory="media"), name="media") 
 
 # CORS 미들웨어 설정 - 프론트엔드에서 API 호출을 허용하기 위함
 app.add_middleware(
