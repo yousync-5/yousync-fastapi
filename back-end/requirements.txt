@@ -37,3 +37,4 @@ yt-dlp==2025.6.25
 # Celery for background tasks
 celery==5.3.4
 redis==5.0.1
+aiohttp==3.9.1

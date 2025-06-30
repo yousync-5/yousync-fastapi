@@ -2,11 +2,19 @@
 
 import os, shutil, requests, logging, boto3, asyncio, json
 from uuid import uuid4
-from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from celery.result import AsyncResult
-from tasks.audio_tasks import process_audio_analysis
-from celery_app import celery_app
+from concurrent.futures import ThreadPoolExecutor
+
+# Celery 관련 임포트 (Railway에서 Redis 연결 시에만 작동)
+try:
+    from celery.result import AsyncResult
+    from tasks.audio_tasks import process_audio_analysis
+    from celery_app import celery_app
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    logging.warning("Celery not available - falling back to background tasks")
 
 # 간단한 메모리 저장소 (프로덕션에서는 DB로 교체 권장)
 analysis_store = {}
@@ -35,45 +43,126 @@ router = APIRouter(
 TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://43.201.26.49:8000/analyze-voice")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/webhook/analysis-complete")
 
-# 1. 오디오 업로드 및 분석 요청 (Celery로 최적화)
+# 비동기 S3 업로드 함수
+async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
+    """비동기 S3 업로드"""
+    def sync_upload():
+        import io
+        key = f"audio/{uuid4().hex}_{filename}"
+        s3.upload_fileobj(io.BytesIO(file_data), S3_BUCKET, key)
+        return key
+    
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, sync_upload)
+
+# 비동기 HTTP 요청 함수
+async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: str, job_id: str):
+    """비동기 분석 요청 (requests 사용)"""
+    def sync_request():
+        try:
+            response = requests.post(
+                TARGET_URL,
+                data={
+                    "s3_audio_url": s3_url,
+                    "video_id": video_id,
+                    "webhook_url": webhook_url
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=30
+            )
+            response.raise_for_status()
+            logging.info(f"[분석 요청 성공] job_id={job_id}")
+        except Exception as e:
+            logging.error(f"[분석 요청 실패] job_id={job_id}, error={e}")
+    
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        await loop.run_in_executor(executor, sync_request)
+
+# 1. 오디오 업로드 및 분석 요청 (Celery + Fallback)
 @router.post("/{token_id}/upload-audio")
 async def upload_audio_by_token_id(
     token_id: str = Path(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     try:
         job_id = str(uuid4())
-        
-        # 파일 데이터를 메모리에서 읽기
         file_data = await file.read()
         
-        # 초기 상태 저장 (즉시 응답을 위해)
+        # 초기 상태 저장
         analysis_store[job_id] = {
-            "status": "queued",
+            "status": "processing",
             "token_id": token_id,
-            "progress": 0,
-            "message": "분석 큐에 추가됨"
+            "progress": 10,
+            "message": "업로드 시작"
         }
+
+        if CELERY_AVAILABLE:
+            # Celery 사용 (Redis 연결 시)
+            try:
+                task = process_audio_analysis.delay(
+                    file_data, 
+                    file.filename, 
+                    token_id, 
+                    job_id
+                )
+                analysis_store[job_id]["task_id"] = task.id
+                logging.info(f"[Celery] 태스크 시작 - job_id: {job_id}")
+                
+                return {
+                    "message": "업로드 완료, Celery로 백그라운드 처리됩니다.",
+                    "job_id": job_id,
+                    "task_id": task.id,
+                    "status": "queued"
+                }
+            except Exception as e:
+                logging.error(f"Celery 실행 실패, BackgroundTasks로 대체: {e}")
+                # Celery 실패 시 BackgroundTasks로 대체
+                pass
         
-        # Celery 태스크 시작 (백그라운드 처리)
-        task = process_audio_analysis.delay(
-            file_data, 
-            file.filename, 
-            token_id, 
-            job_id
-        )
+        # BackgroundTasks 사용 (Celery 미사용 또는 실패 시)
+        async def process_in_background():
+            try:
+                # S3 업로드
+                analysis_store[job_id].update({
+                    "progress": 40,
+                    "message": "S3 업로드 중..."
+                })
+                
+                s3_key = await upload_to_s3_async(file_data, file.filename)
+                s3_url = f"s3://{S3_BUCKET}/{s3_key}"
+                
+                analysis_store[job_id].update({
+                    "progress": 70,
+                    "message": "분석 서버 요청 중...",
+                    "s3_url": s3_url
+                })
+                
+                # 분석 요청
+                webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
+                await send_analysis_request_async(s3_url, "jZOywn1qArI", webhook_url, job_id)
+                
+                analysis_store[job_id].update({
+                    "progress": 90,
+                    "message": "분석 중... 결과 대기"
+                })
+                
+            except Exception as e:
+                logging.error(f"백그라운드 처리 실패: {str(e)}")
+                analysis_store[job_id].update({
+                    "status": "failed",
+                    "error": str(e),
+                    "progress": 0
+                })
+
+        background_tasks.add_task(process_in_background)
         
-        # 태스크 ID 저장
-        analysis_store[job_id]["task_id"] = task.id
-        
-        logging.info(f"[Celery] 태스크 시작 - job_id: {job_id}, task_id: {task.id}")
-        
-        # 즉시 응답 반환 (사용자는 더 이상 기다리지 않음)
         return {
-            "message": "업로드 완료, 분석이 백그라운드에서 진행됩니다.",
+            "message": "업로드 완료, 백그라운드에서 처리됩니다.",
             "job_id": job_id,
-            "task_id": task.id,
-            "status": "queued"
+            "status": "processing"
         }
         
     except Exception as e:
