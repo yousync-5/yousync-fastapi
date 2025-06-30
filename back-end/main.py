@@ -26,15 +26,8 @@ from models import Base
 # 라우터 임포트 - 각 도메인별로 분리된 API 엔드포인트들
 from router.script_router import router as script_router
 from router.token_router import router as token_router
+from router.user_audio_router import router as user_audio_router
 # from router.actor_router import router as actor_router
-
-# user_audio_router는 Celery 의존성이 있으므로 안전하게 임포트
-try:
-    from router.user_audio_router import router as user_audio_router
-    USER_AUDIO_AVAILABLE = True
-except ImportError as e:
-    print(f"user_audio_router 임포트 실패: {e}")
-    USER_AUDIO_AVAILABLE = False
 
 # 데이터베이스 테이블 생성 (앱 시작시 자동으로 테이블이 생성됨)
 Base.metadata.create_all(bind=engine)
@@ -63,10 +56,8 @@ app.add_middleware(
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
 app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
 app.include_router(token_router)   # /tokens 경로로 토큰 관련 API 등록
+app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
 # app.include_router(actor_router)   # /actors 경로로 배우 관련 API 등록
-
-if USER_AUDIO_AVAILABLE:
-    app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
 
 # 루트 엔드포인트 - API 서버 상태 확인용
 @app.get("/")

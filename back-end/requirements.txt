@@ -34,7 +34,5 @@ watchfiles==1.1.0
 websockets==15.0.1
 yt-dlp==2025.6.25
 
-# Celery for background tasks
-celery==5.3.4
-redis==5.0.1
-aiohttp==3.9.1
+# HTTP client for async requests
+httpx==0.28.1

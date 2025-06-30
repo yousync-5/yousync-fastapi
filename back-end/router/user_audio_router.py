@@ -1,20 +1,11 @@
 # router/user_audio_router.py
 
-import os, shutil, requests, logging, boto3, asyncio, json
+import os, logging, boto3, asyncio, json
 from uuid import uuid4
 from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
-
-# Celery 관련 임포트 (Railway에서 Redis 연결 시에만 작동)
-try:
-    from celery.result import AsyncResult
-    from tasks.audio_tasks import process_audio_analysis
-    from celery_app import celery_app
-    CELERY_AVAILABLE = True
-except ImportError:
-    CELERY_AVAILABLE = False
-    logging.warning("Celery not available - falling back to background tasks")
+import httpx
 
 # 간단한 메모리 저장소 (프로덕션에서는 DB로 교체 권장)
 analysis_store = {}
@@ -58,29 +49,24 @@ async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
 
 # 비동기 HTTP 요청 함수
 async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: str, job_id: str):
-    """비동기 분석 요청 (requests 사용)"""
-    def sync_request():
-        try:
-            response = requests.post(
+    """httpx를 사용한 완전 비동기 분석 요청"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
                 TARGET_URL,
                 data={
                     "s3_audio_url": s3_url,
                     "video_id": video_id,
                     "webhook_url": webhook_url
                 },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=30
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
             response.raise_for_status()
             logging.info(f"[분석 요청 성공] job_id={job_id}")
-        except Exception as e:
-            logging.error(f"[분석 요청 실패] job_id={job_id}, error={e}")
-    
-    loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor() as executor:
-        await loop.run_in_executor(executor, sync_request)
+    except Exception as e:
+        logging.error(f"[분석 요청 실패] job_id={job_id}, error={e}")
 
-# 1. 오디오 업로드 및 분석 요청 (Celery + Fallback)
+# 1. 오디오 업로드 및 분석 요청 (완전 비동기 처리)
 @router.post("/{token_id}/upload-audio")
 async def upload_audio_by_token_id(
     token_id: str = Path(...),
@@ -99,30 +85,7 @@ async def upload_audio_by_token_id(
             "message": "업로드 시작"
         }
 
-        if CELERY_AVAILABLE:
-            # Celery 사용 (Redis 연결 시)
-            try:
-                task = process_audio_analysis.delay(
-                    file_data, 
-                    file.filename, 
-                    token_id, 
-                    job_id
-                )
-                analysis_store[job_id]["task_id"] = task.id
-                logging.info(f"[Celery] 태스크 시작 - job_id: {job_id}")
-                
-                return {
-                    "message": "업로드 완료, Celery로 백그라운드 처리됩니다.",
-                    "job_id": job_id,
-                    "task_id": task.id,
-                    "status": "queued"
-                }
-            except Exception as e:
-                logging.error(f"Celery 실행 실패, BackgroundTasks로 대체: {e}")
-                # Celery 실패 시 BackgroundTasks로 대체
-                pass
-        
-        # BackgroundTasks 사용 (Celery 미사용 또는 실패 시)
+        # 백그라운드에서 완전 비동기 처리
         async def process_in_background():
             try:
                 # S3 업로드
@@ -140,7 +103,7 @@ async def upload_audio_by_token_id(
                     "s3_url": s3_url
                 })
                 
-                # 분석 요청
+                # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
                 await send_analysis_request_async(s3_url, "jZOywn1qArI", webhook_url, job_id)
                 
@@ -203,58 +166,14 @@ async def receive_analysis(request: Request):
     return {"received": True, "job_id": job_id, "task_id": task_id}
 
 
-# 3. 클라이언트가 조회할 수 있는 결과 조회 API (실시간 진행 상황 포함)
+# 3. 클라이언트가 조회할 수 있는 결과 조회 API
 @router.get("/analysis-result/{job_id}")
 def get_analysis_result(job_id: str):
-    """분석 결과 조회 (Celery 태스크 상태 포함)"""
+    """분석 결과 조회"""
     stored_data = analysis_store.get(job_id)
     if not stored_data:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
     
-    task_id = stored_data.get("task_id")
-    if task_id:
-        try:
-            # Celery 태스크 상태 확인
-            result = AsyncResult(task_id, app=celery_app)
-            
-            if result.state == "PENDING":
-                return {
-                    **stored_data,
-                    "status": "queued",
-                    "progress": 0,
-                    "message": "분석 대기 중..."
-                }
-            elif result.state == "PROGRESS":
-                task_info = result.info or {}
-                return {
-                    **stored_data,
-                    "status": "processing",
-                    "progress": task_info.get("progress", 0),
-                    "message": task_info.get("status", "처리 중..."),
-                    "s3_url": task_info.get("s3_url")
-                }
-            elif result.state == "SUCCESS":
-                task_result = result.result or {}
-                return {
-                    **stored_data,
-                    "status": "awaiting_webhook",  # 분석 서버 작업 완료, 웹훅 대기
-                    "progress": task_result.get("progress", 70),
-                    "message": "분석 서버 처리 완료, 결과 대기 중...",
-                    "task_result": task_result
-                }
-            elif result.state == "FAILURE":
-                error_info = result.info or {}
-                return {
-                    **stored_data,
-                    "status": "failed",
-                    "progress": 0,
-                    "error": str(error_info.get("error", result.info)),
-                    "retries": error_info.get("retries", 0)
-                }
-        except Exception as e:
-            logging.error(f"Celery 결과 조회 실패: {e}")
-    
-    # 기본 저장된 데이터 반환
     return stored_data
 
 
@@ -268,62 +187,17 @@ async def stream_analysis_progress(job_id: str):
             yield f"data: {json.dumps({'error': 'Job not found'}, ensure_ascii=False)}\n\n"
             return
             
-        task_id = stored_data.get("task_id")
-        
         while True:
             try:
-                if task_id:
-                    result = AsyncResult(task_id, app=celery_app)
-                    
-                    if result.state == "PENDING":
-                        data = {
-                            **stored_data,
-                            "status": "queued",
-                            "progress": 0,
-                            "message": "분석 대기 중..."
-                        }
-                    elif result.state == "PROGRESS":
-                        task_info = result.info or {}
-                        data = {
-                            **stored_data,
-                            "status": "processing",
-                            "progress": task_info.get("progress", 0),
-                            "message": task_info.get("status", "처리 중..."),
-                            "s3_url": task_info.get("s3_url")
-                        }
-                    elif result.state == "SUCCESS":
-                        task_result = result.result or {}
-                        data = {
-                            **stored_data,
-                            "status": "awaiting_webhook",
-                            "progress": task_result.get("progress", 70),
-                            "message": "분석 서버 처리 완료, 결과 대기 중...",
-                            "task_result": task_result
-                        }
-                    elif result.state == "FAILURE":
-                        error_info = result.info or {}
-                        data = {
-                            **stored_data,
-                            "status": "failed",
-                            "progress": 0,
-                            "error": str(error_info.get("error", result.info))
-                        }
-                        yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                        break
-                    else:
-                        data = stored_data
-                else:
-                    data = stored_data
+                # 현재 저장된 데이터 조회
+                current_data = analysis_store.get(job_id, {})
                 
-                # 최종 완료 확인 (웹훅으로 완료된 경우)
-                current_stored = analysis_store.get(job_id, {})
-                if current_stored.get("status") == "completed":
-                    data = current_stored
-                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                # 완료된 경우 마지막 데이터 전송 후 종료
+                if current_data.get("status") in ["completed", "failed"]:
+                    yield f"data: {json.dumps(current_data, ensure_ascii=False)}\n\n"
                     break
                 
-                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                
+                yield f"data: {json.dumps(current_data, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(1)  # 1초마다 업데이트
                 
             except Exception as e:
