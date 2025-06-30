@@ -28,7 +28,7 @@ router = APIRouter(
     tags=["movies"]
 )
 
-TARGET_URL = os.getenv("TARGET_SERVER_URL", "https://escargot-immune-jaguar.ngrok-free.app/analyze-voice")
+TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://43.201.26.49:8000/analyze-voice")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/webhook/analysis-complete")
 
 # 1. 오디오 업로드 및 분석 요청
@@ -53,7 +53,7 @@ async def upload_audio_by_movie_id(
                     "webhook_url": webhook_url
                 },
                 headers={
-                    "ngrok-skip-browser-warning": "true",
+                    # "ngrok-skip-browser-warning": "true",
                     "Content-Type": "application/x-www-form-urlencoded"
                 },
             )
