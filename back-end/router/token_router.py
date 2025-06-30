@@ -84,17 +84,17 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
     return {"detail": "Token deleted successfully"}
 
 # 카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
-@router.get("/category/{category}", response_model=List[TokenSchema])
-def read_tokens_by_category(category: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """
-    특정 카테고리의 토큰들을 조회합니다.
+# @router.get("/category/{category}", response_model=List[TokenSchema])
+# def read_tokens_by_category(category: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+#     """
+#     특정 카테고리의 토큰들을 조회합니다.
     
-    - **category**: 조회할 카테고리명
-    - **skip**: 건너뛸 항목 수 (기본값: 0) 
-    - **limit**: 가져올 최대 항목 수 (기본값: 100)
-    """
-    tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
-    return tokens
+#     - **category**: 조회할 카테고리명
+#     - **skip**: 건너뛸 항목 수 (기본값: 0) 
+#     - **limit**: 가져올 최대 항목 수 (기본값: 100)
+#     """
+#     tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
+#     return tokens
 
 # 배우별 영화 조회 API - MovieActor 관계 테이블을 통해 조회
 # @router.get("/actor/{actor_name}", response_model=List[TokenSchema])

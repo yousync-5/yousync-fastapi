@@ -36,7 +36,7 @@ class Script(ScriptBase):
 class TokenBase(BaseModel):
     token_name: str
     actor_name: str
-    category: str
+    category: Optional[str] = None
     start_time: float
     end_time: float
     s3_textgrid_url: Optional[str] = None
