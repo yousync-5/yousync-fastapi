@@ -9,7 +9,7 @@ class Token(Base):
     id = Column(Integer, primary_key=True, index=True)  # token_id
     token_name = Column(String, nullable=False)
     actor_name = Column(String, nullable=False)
-    category = Column(String, nullable=False)
+    category = Column(String, nullable=True)
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
 
