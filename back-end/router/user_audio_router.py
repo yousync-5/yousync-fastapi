@@ -145,6 +145,13 @@ async def receive_analysis(request: Request):
         logging.warning("[❗경고] job_id 없이 webhook 도착. 무시됨")
         return JSONResponse(status_code=400, content={"error": "job_id is required"})
 
+    # 이미 완료된 job_id인지 확인
+    if job_id in analysis_store:
+        current_status = analysis_store[job_id].get("status")
+        if current_status == "completed":
+            logging.info(f"[중복 요청 무시] job_id={job_id}는 이미 완료된 상태")
+            return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
+
     data = await request.json()
     
     # 분석 완료 상태로 업데이트
@@ -159,7 +166,8 @@ async def receive_analysis(request: Request):
         analysis_store[job_id] = {
             "status": "completed",
             "progress": 100,
-            "result": data
+            "result": data,
+            "message": "분석 완료"
         }
 
     logging.info(f"[분석 결과 수신] job_id={job_id}, task_id={task_id}, status={data.get('status')}")
