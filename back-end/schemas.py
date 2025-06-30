@@ -17,41 +17,36 @@ class Actor(ActorBase):
 
 # === Script Schemas ===
 class ScriptBase(BaseModel):
-    movie_id: int
-    actor_id: int
+    token_id: int  # ✅ 변경: token_id를 기반으로 연결
     start_time: float
     end_time: float
     script: str
-    translation: Optional[str] = None
-    url: Optional[str] = None
-    actor_pitch_values: Optional[List[int]] = None
-    background_audio_url: Optional[str] = None
-    # user_voice_url: Optional[str] = None
-    # user_voice_uploaded_at: Optional[datetime] = None
 
 class ScriptCreate(ScriptBase):
     pass
 
 class Script(ScriptBase):
     id: int
-    actor: Optional[Actor] = None  # 배우 정보 포함
+    # actor: Optional[Actor] = None  # 배우 정보 포함
     
     class Config:
         from_attributes = True
 
-# === Movie Schemas ===
-class MovieBase(BaseModel):
-    title: str
-    category: Optional[str] = None
-    youtube_url: str
-    total_time: Optional[int] = None
-    bookmark: bool = False
-    full_background_audio_url: Optional[str] = None
+# === Token Schemas ===
+class TokenBase(BaseModel):
+    token_name: str
+    actor_name: str
+    start_time: float
+    end_time: float
+    s3_textgrid_url: Optional[str] = None
+    s3_pitch_url: Optional[str] = None
+    s3_bgvoice_url: Optional[str] = None
+    youtube_url: Optional[str] = None
 
-class MovieCreate(MovieBase):
+class TokenCreate(TokenBase):
     pass
 
-class Movie(MovieBase):
+class Token(TokenBase):
     id: int
     scripts: List[Script] = []  # 영화에 속한 스크립트 목록
     
