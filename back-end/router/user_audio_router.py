@@ -32,7 +32,7 @@ router = APIRouter(
 )
 
 TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://54.180.25.231:8000/analyze-voice")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/webhook/analysis-complete")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/tokens/webhook/analysis-complete")
 
 # 비동기 S3 업로드 함수
 async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
