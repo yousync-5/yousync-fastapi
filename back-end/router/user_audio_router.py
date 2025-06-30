@@ -24,17 +24,17 @@ def upload_to_s3(file, filename) -> str:
 # ===============================================
 
 router = APIRouter(
-    prefix="/movies",
-    tags=["movies"]
+    prefix="/tokens",
+    tags=["tokens"]
 )
 
 TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://43.201.26.49:8000/analyze-voice")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/webhook/analysis-complete")
 
 # 1. 오디오 업로드 및 분석 요청
-@router.post("/{movie_id}/upload-audio")
-async def upload_audio_by_movie_id(
-    movie_id: str = Path(...),
+@router.post("/{token_id}/upload-audio")
+async def upload_audio_by_token_id(
+    token_id: str = Path(...),
     file: UploadFile = File(...)
 ):
     try:
@@ -49,7 +49,7 @@ async def upload_audio_by_movie_id(
                 TARGET_URL,
                 data={
                     "s3_audio_url": s3_url,
-                    "video_id": movie_id,
+                    "video_id": token_id,
                     "webhook_url": webhook_url
                 },
                 headers={
@@ -65,7 +65,7 @@ async def upload_audio_by_movie_id(
         analysis_store[job_id] = {
             "status": "processing",
             "s3_audio_url": s3_url,
-            "video_id": movie_id
+            "video_id": token_id
         }
 
         return {

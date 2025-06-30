@@ -25,7 +25,7 @@ from models import Base
 
 # 라우터 임포트 - 각 도메인별로 분리된 API 엔드포인트들
 from router.script_router import router as script_router
-from router.movie_router import router as movie_router
+from router.token_router import router as token_router
 # from router.actor_router import router as actor_router
 from router.user_audio_router import router as user_audio_router
 
@@ -55,7 +55,7 @@ app.add_middleware(
 
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
 app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
-app.include_router(movie_router)   # /movies 경로로 영화 관련 API 등록
+app.include_router(token_router)   # /movies 경로로 영화 관련 API 등록
 # app.include_router(actor_router)   # /actors 경로로 배우 관련 API 등록
 app.include_router(user_audio_router) # /movies/{movie_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
 
@@ -67,7 +67,7 @@ def read_root():
     서버가 정상적으로 작동하는지 확인할 때 사용합니다.
     """
     return {
-        "message": "영화/스크립트 관리 API 서버가 정상적으로 작동중입니다!",
+        "message": "토큰/스크립트 관리 API 서버가 정상적으로 작동중입니다!",
         "docs": "/docs",
         "redoc": "/redoc",
         "version": "1.0.0"
@@ -80,4 +80,4 @@ def health_check():
     서버 상태를 체크하는 헬스체크 엔드포인트입니다.
     로드밸런서나 모니터링 도구에서 서버 상태를 확인할 때 사용합니다.
     """
-    return {"status": "healthy", "service": "movie-script-api"}
+    return {"status": "healthy", "service": "token-script-api"}

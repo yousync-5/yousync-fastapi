@@ -5,7 +5,7 @@ from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
-from models import Script, Actor, Movie
+from models import Script, Token
 from schemas import Script as ScriptSchema, ScriptCreate
 
 # APIRouter 인스턴스 생성 - 모든 스크립트 관련 엔드포인트의 접두사로 "/scripts" 사용
@@ -17,23 +17,11 @@ router = APIRouter(
 # 스크립트 생성 API - POST 요청으로 새로운 스크립트 데이터를 받아 데이터베이스에 저장
 @router.post("/", response_model=ScriptSchema)
 def create_script(script: ScriptCreate, db: Session = Depends(get_db)):
-    """
-    새로운 스크립트를 생성합니다.
-    
-    - **movie_id**: 영화 ID (필수)
-    - **actor_id**: 배우 ID (필수)
-    - **start_time**: 대사 시작 시간 (필수)
-    - **end_time**: 대사 종료 시간 (필수)
-    - **script**: 대사 내용 (필수)
-    """
+
     # 영화와 배우 존재 여부 확인
-    movie = db.query(Movie).filter(Movie.id == script.movie_id).first()
-    if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-    
-    actor = db.query(Actor).filter(Actor.id == script.actor_id).first()
-    if not actor:
-        raise HTTPException(status_code=404, detail="Actor not found")
+    token = db.query(Token).filter(Token.id == script.token_id).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Token not found")
     
     db_script = Script(**script.dict())  # Pydantic 모델을 SQLAlchemy 모델로 변환
     db.add(db_script)  # 데이터베이스 세션에 추가
@@ -84,15 +72,10 @@ def update_script(script_id: int, script: ScriptCreate, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="Script not found")
     
     # 영화와 배우 존재 여부 확인
-    if script.movie_id:
-        movie = db.query(Movie).filter(Movie.id == script.movie_id).first()
-        if not movie:
-            raise HTTPException(status_code=404, detail="Movie not found")
-    
-    if script.actor_id:
-        actor = db.query(Actor).filter(Actor.id == script.actor_id).first()
-        if not actor:
-            raise HTTPException(status_code=404, detail="Actor not found")
+    if script.token_id:
+        token = db.query(Token).filter(Token.id == script.token_id).first()
+        if not token:
+            raise HTTPException(status_code=404, detail="Token not found")
     
     # 기존 스크립트 데이터를 새로운 데이터로 업데이트
     for field, value in script.dict().items():
@@ -119,27 +102,12 @@ def delete_script(script_id: int, db: Session = Depends(get_db)):
     return {"detail": "Script deleted successfully"}
 
 # 영화별 스크립트 조회 API
-@router.get("/movie/{movie_id}", response_model=List[ScriptSchema])
-def read_scripts_by_movie(movie_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/token/{token_id}", response_model=List[ScriptSchema])
+def read_scripts_by_token(token_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
-    특정 영화의 스크립트들을 조회합니다.
+    특정 토큰의 스크립트들을 조회합니다.
     
-    - **movie_id**: 조회할 영화의 ID
-    - **skip**: 건너뛸 항목 수 (기본값: 0)
-    - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
-    scripts = db.query(Script).filter(Script.movie_id == movie_id).offset(skip).limit(limit).all()
+    scripts = db.query(Script).filter(Script.token_id == token_id).offset(skip).limit(limit).all()
     return scripts
 
-# 배우별 스크립트 조회 API
-@router.get("/actor/{actor_id}", response_model=List[ScriptSchema])
-def read_scripts_by_actor(actor_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """
-    특정 배우의 스크립트들을 조회합니다.
-    
-    - **actor_id**: 조회할 배우의 ID
-    - **skip**: 건너뛸 항목 수 (기본값: 0)
-    - **limit**: 가져올 최대 항목 수 (기본값: 100)
-    """
-    scripts = db.query(Script).filter(Script.actor_id == actor_id).offset(skip).limit(limit).all()
-    return scripts
