@@ -23,7 +23,6 @@ def upload_to_s3(file, filename) -> str:
     return key
 # ===============================================
 
-
 router = APIRouter(
     prefix="/movies",
     tags=["movies"]
@@ -102,4 +101,3 @@ def get_analysis_result(job_id: str):
         return result
     else:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
-

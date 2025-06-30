@@ -31,7 +31,7 @@ class Script(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
-    actor_id = Column(Integer, ForeignKey("actors.id"), nullable=False)
+    actor_id = Column(Integer, ForeignKey("actors.id"), nullable=False) # actor 과의 종속성으로 없어도 될 필드 같음
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     script = Column(Text, nullable=False)
