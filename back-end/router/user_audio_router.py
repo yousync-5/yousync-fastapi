@@ -31,7 +31,7 @@ router = APIRouter(
     tags=["tokens"]
 )
 
-TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://43.201.26.49:8000/analyze-voice")
+TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://54.180.25.231:8000/analyze-voice")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/webhook/analysis-complete")
 
 # 비동기 S3 업로드 함수
