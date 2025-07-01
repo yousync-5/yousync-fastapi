@@ -52,7 +52,7 @@ async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
         return await loop.run_in_executor(executor, sync_upload)
 
 # 비동기 HTTP 요청 함수
-async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: str, job_id: str, token_info: Token):
+async def send_analysis_request_async(s3_url: str, token_id: int, webhook_url: str, job_id: str, token_info: Token):
     """httpx를 사용한 완전 비동기 분석 요청"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -60,7 +60,7 @@ async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: s
                 TARGET_URL,
                 data={
                     "s3_audio_url": s3_url,
-                    "video_id": video_id,
+                    "token_id": token_id,
                     "webhook_url": webhook_url,
                     "s3_textgrid_url": f"s3://{S3_BUCKET}/{token_info.s3_textgrid_url}" if token_info.s3_textgrid_url else None,
                     "s3_pitch_url": f"s3://{S3_BUCKET}/{token_info.s3_pitch_url}" if token_info.s3_pitch_url else None
@@ -119,7 +119,7 @@ async def upload_audio_by_token_id(
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
                 await send_analysis_request_async(
                     s3_url = s3_url, 
-                    video_id = token_info.video_id, 
+                    token_id = token_info.id, 
                     webhook_url = webhook_url, 
                     job_id = job_id,
                     token_info = token_info

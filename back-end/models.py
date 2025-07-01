@@ -7,7 +7,7 @@ class Token(Base):
     __tablename__ = "tokens"  # 토큰 단위 (token_id)
 
     id = Column(Integer, primary_key=True, index=True)  # token_id
-    video_id = Column(String, nullable=True)  
+    
     token_name = Column(String, nullable=False)
     actor_name = Column(String, nullable=False)
     category = Column(String, nullable=True)
