@@ -8,15 +8,39 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 from database import get_db
 from sqlalchemy.orm import Session
-from models import Token
+from models import Token, AnalysisResult
 
 async def get_token_by_id(token_id: str, db:Session):
     token = db.query(Token).filter(Token.id == int(token_id)).first()
     if not token:
         raise HTTPException(status_code=404, detail="Token not found")
     return token
-# 간단한 메모리 저장소 (프로덕션에서는 DB로 교체 권장)
-analysis_store = {}
+
+# DB 헬퍼 함수들
+def create_analysis_result(db: Session, job_id: str, token_id: int, status: str = "processing", progress: int = 10, message: str = "업로드 시작"):
+    analysis_result = AnalysisResult(
+        job_id=job_id,
+        token_id=token_id,
+        status=status,
+        progress=progress,
+        message=message
+    )
+    db.add(analysis_result)
+    db.commit()
+    db.refresh(analysis_result)
+    return analysis_result
+
+def update_analysis_result(db: Session, job_id: str, **kwargs):
+    analysis_result = db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
+    if analysis_result:
+        for key, value in kwargs.items():
+            setattr(analysis_result, key, value)
+        db.commit()
+        db.refresh(analysis_result)
+    return analysis_result
+
+def get_analysis_result(db: Session, job_id: str):
+    return db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
 
 # boto3로 업로드 함수 구현, 추후 분리 가능 boto3를 import
 s3 = boto3.client(
@@ -89,34 +113,23 @@ async def upload_audio_by_token_id(
         job_id = str(uuid4())
         file_data = await file.read()
         token_info = await get_token_by_id(token_id, db)
-        # 초기 상태 저장
-        analysis_store[job_id] = {
-            "status": "processing",
-            "token_id": token_id,
-            "progress": 10,
-            "message": "업로드 시작"
-        }
+        
+        # DB에 초기 상태 저장
+        analysis_result = create_analysis_result(db, job_id, int(token_id))
 
         # 백그라운드에서 완전 비동기 처리
         async def process_in_background():
+            # 새로운 DB 세션 생성 (백그라운드 작업용)
+            from database import SessionLocal
+            bg_db = SessionLocal()
             try:
-                
                 # S3 업로드
-                analysis_store[job_id].update({
-                    "progress": 40,
-                    "message": "S3 업로드 중..."
-                })
+                update_analysis_result(bg_db, job_id, progress=40, message="S3 업로드 중...")
                 
                 s3_key = await upload_to_s3_async(file_data, file.filename)
                 s3_url = f"s3://{S3_BUCKET}/{s3_key}"
-
-                #token_info = await get_token_by_id(token_id, db)
                 
-                analysis_store[job_id].update({
-                    "progress": 70,
-                    "message": "분석 서버 요청 중...",
-                    "s3_url": s3_url
-                })
+                update_analysis_result(bg_db, job_id, progress=70, message="분석 서버 요청 중...")
                 
                 # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
@@ -126,20 +139,15 @@ async def upload_audio_by_token_id(
                     webhook_url, 
                     job_id,
                     token_info
-                    )
+                )
                 
-                analysis_store[job_id].update({
-                    "progress": 90,
-                    "message": "분석 중... 결과 대기"
-                })
+                update_analysis_result(bg_db, job_id, progress=90, message="분석 중... 결과 대기")
                 
             except Exception as e:
                 logging.error(f"백그라운드 처리 실패: {str(e)}")
-                analysis_store[job_id].update({
-                    "status": "failed",
-                    "error": str(e),
-                    "progress": 0
-                })
+                update_analysis_result(bg_db, job_id, status="failed", message=str(e), progress=0)
+            finally:
+                bg_db.close()
 
         background_tasks.add_task(process_in_background)
         
@@ -161,7 +169,7 @@ async def upload_audio_by_token_id(
 
 # 2. 분석 결과를 수신할 웹훅 엔드포인트
 @router.post("/webhook/analysis-complete")
-async def receive_analysis(request: Request):
+async def receive_analysis(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import JSONResponse
     
     job_id = request.query_params.get("job_id")
@@ -172,32 +180,20 @@ async def receive_analysis(request: Request):
         return JSONResponse(status_code=400, content={"error": "job_id is required"})
 
     # 이미 완료된 job_id인지 확인
-    if job_id in analysis_store:
-        current_status = analysis_store[job_id].get("status")
-        if current_status == "completed":
-            logging.info(f"[중복 요청 무시] job_id={job_id}는 이미 완료된 상태")
-            return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
+    existing_result = get_analysis_result(db, job_id)
+    if existing_result and existing_result.status == "completed":
+        logging.info(f"[중복 요청 무시] job_id={job_id}는 이미 완료된 상태")
+        return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
 
     data = await request.json()
-
-    # analysis_results만 추출
     results = data.get("analysis_results", {})
     
     # 분석 완료 상태로 업데이트
-    if job_id in analysis_store:
-        analysis_store[job_id].update({
-            "status": "completed",
-            "progress": 100,
-            "result": results,
-            "message": "분석 완료"
-        })
-    else:
-        analysis_store[job_id] = {
-            "status": "completed",
-            "progress": 100,
-            "result": results,
-            "message": "분석 완료"
-        }
+    update_analysis_result(db, job_id, 
+                          status="completed", 
+                          progress=100, 
+                          result=results, 
+                          message="분석 완료")
 
     logging.info(f"[분석 결과 수신] job_id={job_id}, task_id={task_id}, result={results}")
     return {"received": True, "job_id": job_id, "task_id": task_id}
@@ -205,13 +201,21 @@ async def receive_analysis(request: Request):
 
 # 3. 클라이언트가 조회할 수 있는 결과 조회 API
 @router.get("/analysis-result/{job_id}")
-def get_analysis_result(job_id: str):
+def get_analysis_result_api(job_id: str, db: Session = Depends(get_db)):
     """분석 결과 조회"""
-    stored_data = analysis_store.get(job_id)
+    stored_data = get_analysis_result(db, job_id)
     if not stored_data:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
     
-    return stored_data
+    return {
+        "job_id": stored_data.job_id,
+        "token_id": stored_data.token_id,
+        "status": stored_data.status,
+        "progress": stored_data.progress,
+        "result": stored_data.result,
+        "message": stored_data.message,
+        "created_at": stored_data.created_at
+    }
 
 
 # 4. 실시간 진행 상황을 위한 Server-Sent Events 엔드포인트
@@ -219,22 +223,35 @@ def get_analysis_result(job_id: str):
 async def stream_analysis_progress(job_id: str):
     """실시간 진행 상황 스트리밍 (SSE)"""
     async def event_generator():
-        stored_data = analysis_store.get(job_id)
-        if not stored_data:
-            yield f"data: {json.dumps({'error': 'Job not found'}, ensure_ascii=False)}\n\n"
-            return
-            
+        from database import SessionLocal
+        
         while True:
             try:
-                # 현재 저장된 데이터 조회
-                current_data = analysis_store.get(job_id, {})
-                
-                # 완료된 경우 마지막 데이터 전송 후 종료
-                if current_data.get("status") in ["completed", "failed"]:
-                    yield f"data: {json.dumps(current_data, ensure_ascii=False)}\n\n"
-                    break
-                
-                yield f"data: {json.dumps(current_data, ensure_ascii=False)}\n\n"
+                # 새로운 DB 세션으로 현재 상태 조회
+                db = SessionLocal()
+                try:
+                    current_data = get_analysis_result(db, job_id)
+                    if not current_data:
+                        yield f"data: {json.dumps({'error': 'Job not found'}, ensure_ascii=False)}\n\n"
+                        break
+                    
+                    data_dict = {
+                        "job_id": current_data.job_id,
+                        "status": current_data.status,
+                        "progress": current_data.progress,
+                        "message": current_data.message,
+                        "result": current_data.result
+                    }
+                    
+                    # 완료된 경우 마지막 데이터 전송 후 종료
+                    if current_data.status in ["completed", "failed"]:
+                        yield f"data: {json.dumps(data_dict, ensure_ascii=False)}\n\n"
+                        break
+                    
+                    yield f"data: {json.dumps(data_dict, ensure_ascii=False)}\n\n"
+                finally:
+                    db.close()
+                    
                 await asyncio.sleep(1)  # 1초마다 업데이트
                 
             except Exception as e:

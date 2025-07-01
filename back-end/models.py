@@ -20,6 +20,7 @@ class Token(Base):
     youtube_url  = Column(Text, nullable=True)
     # 관계
     scripts = relationship("Script", back_populates="token", cascade="all, delete")
+    analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
 
 class Actor(Base):
     __tablename__ = "actors"
@@ -68,9 +69,4 @@ class AnalysisResult(Base):
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-    token = relationship("Token")
-
-# Token 에 역참조(optional)
-Token.analysis_results = relationship(
-    "AnalysisResult", back_populates="token", cascade="all, delete"
-)
+    token = relationship("Token", back_populates="analysis_results")
