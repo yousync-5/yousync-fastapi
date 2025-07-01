@@ -27,10 +27,7 @@ s3 = boto3.client(
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
-def upload_to_s3(file, filename) -> str:
-    key = f"audio/{uuid4().hex}_{filename}"
-    s3.upload_fileobj(file, S3_BUCKET, key)
-    return key
+
 # ===============================================
 
 router = APIRouter(
