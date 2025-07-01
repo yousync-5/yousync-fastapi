@@ -21,6 +21,8 @@ class ScriptBase(BaseModel):
     start_time: float
     end_time: float
     script: str
+    translation: Optional[str] = None
+
 
 class ScriptCreate(ScriptBase):
     pass

@@ -2,11 +2,18 @@
 
 import os, logging, boto3, asyncio, json
 from uuid import uuid4
-from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks, Depends
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
 import httpx
-
+from database import get_db
+from sqlalchemy.orm import Session
+from models import Token
+async def get_token_by_id(token_id: str, db:Session):
+    token = db.query(Token).filter(Token.id == int(token_id)).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Token not found")
+    return token
 # 간단한 메모리 저장소 (프로덕션에서는 DB로 교체 권장)
 analysis_store = {}
 
@@ -48,7 +55,7 @@ async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
         return await loop.run_in_executor(executor, sync_upload)
 
 # 비동기 HTTP 요청 함수
-async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: str, job_id: str):
+async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: str, job_id: str, token_info: Token):
     """httpx를 사용한 완전 비동기 분석 요청"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -57,7 +64,10 @@ async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: s
                 data={
                     "s3_audio_url": s3_url,
                     "video_id": video_id,
-                    "webhook_url": webhook_url
+                    "webhook_url": webhook_url,
+                    "s3_textgrid_url": f"s3://{S3_BUCKET}/{token_info.s3_textgrid_url}" if token_info.s3_textgrid_url else None,
+                    "s3_pitch_url": f"s3://{S3_BUCKET}/{token_info.s3_pitch_url}" if token_info.s3_pitch_url else None
+
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
@@ -71,12 +81,14 @@ async def send_analysis_request_async(s3_url: str, video_id: str, webhook_url: s
 async def upload_audio_by_token_id(
     token_id: str = Path(...),
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db)
+    
 ):
     try:
         job_id = str(uuid4())
         file_data = await file.read()
-        
+        token_info = await get_token_by_id(token_id, db)
         # 초기 상태 저장
         analysis_store[job_id] = {
             "status": "processing",
@@ -88,6 +100,7 @@ async def upload_audio_by_token_id(
         # 백그라운드에서 완전 비동기 처리
         async def process_in_background():
             try:
+                
                 # S3 업로드
                 analysis_store[job_id].update({
                     "progress": 40,
@@ -96,6 +109,8 @@ async def upload_audio_by_token_id(
                 
                 s3_key = await upload_to_s3_async(file_data, file.filename)
                 s3_url = f"s3://{S3_BUCKET}/{s3_key}"
+
+                #token_info = await get_token_by_id(token_id, db)
                 
                 analysis_store[job_id].update({
                     "progress": 70,
@@ -105,7 +120,13 @@ async def upload_audio_by_token_id(
                 
                 # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
-                await send_analysis_request_async(s3_url, "jZOywn1qArI", webhook_url, job_id)
+                await send_analysis_request_async(
+                    s3_url = s3_url, 
+                    video_id = token_info.video_id, 
+                    webhook_url = webhook_url, 
+                    job_id = job_id,
+                    token_info = token_info
+                    )
                 
                 analysis_store[job_id].update({
                     "progress": 90,
@@ -125,7 +146,12 @@ async def upload_audio_by_token_id(
         return {
             "message": "업로드 완료, 백그라운드에서 처리됩니다.",
             "job_id": job_id,
-            "status": "processing"
+            "status": "processing",
+            "token_info": {
+                "id": token_info.id,
+                "s3_textgrid_url": getattr(token_info, 's3_textgrid_url', None),
+                "s3_pitch_url": getattr(token_info, 's3_pitch_url', None)
+            }
         }
         
     except Exception as e:
@@ -153,24 +179,27 @@ async def receive_analysis(request: Request):
             return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
 
     data = await request.json()
+
+    # analysis_results만 추출
+    results = data.get("analysis_results", {})
     
     # 분석 완료 상태로 업데이트
     if job_id in analysis_store:
         analysis_store[job_id].update({
             "status": "completed",
             "progress": 100,
-            "result": data,
+            "result": results,
             "message": "분석 완료"
         })
     else:
         analysis_store[job_id] = {
             "status": "completed",
             "progress": 100,
-            "result": data,
+            "result": results,
             "message": "분석 완료"
         }
 
-    logging.info(f"[분석 결과 수신] job_id={job_id}, task_id={task_id}, status={data.get('status')}")
+    logging.info(f"[분석 결과 수신] job_id={job_id}, task_id={task_id}, result={results}")
     return {"received": True, "job_id": job_id, "task_id": task_id}
 
 

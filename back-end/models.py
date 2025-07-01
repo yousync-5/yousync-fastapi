@@ -37,6 +37,7 @@ class Script(Base):
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     script = Column(Text, nullable=False)
+    translation = Column(Text, nullable=True)
 
     token = relationship("Token", back_populates="scripts")
 
