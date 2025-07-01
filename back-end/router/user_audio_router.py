@@ -71,6 +71,8 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
             )
             response.raise_for_status()
             logging.info(f"[분석 요청 성공] job_id={job_id}")
+    except httpx.HTTPStatusError as e:
+        logging.error(f"[분석 요청 실패] job_id={job_id}, status={e.response.status_code}, body={e.response.text}")
     except Exception as e:
         logging.error(f"[분석 요청 실패] job_id={job_id}, error={e}")
 
