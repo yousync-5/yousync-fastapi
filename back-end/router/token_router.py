@@ -1,12 +1,14 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,Path
 from sqlalchemy.orm import Session
 from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
 from models import Token
-from schemas import Token as TokenSchema, TokenCreate
+from schemas import Token as TokenSchema
+from schemas import TokenCreate,TokenDetail
+from .utils_s3 import load_json, presign
 
 # APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
 router = APIRouter(
@@ -27,7 +29,7 @@ def create_token(token: TokenCreate, db: Session = Depends(get_db)):
     return db_token
 
 # 모든 영화 조회 API - 페이지네이션 지원
-@router.get("/", response_model=List[TokenSchema])
+@router.get("/", response_model=List[TokenCreate])
 def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     모든 토큰 목록을 조회합니다.
@@ -39,17 +41,41 @@ def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return tokens
 
 # 특정 영화 조회 API - ID로 하나의 영화만 가져오기
-@router.get("/{token_id}", response_model=TokenSchema)
-def read_token(token_id: int, db: Session = Depends(get_db)):
-    """
-    특정 ID의 토큰을 조회합니다.
+# @router.get("/{token_id}", response_model=TokenSchema)
+# def read_token(token_id: int, db: Session = Depends(get_db)):
+#     """
+#     특정 ID의 토큰을 조회합니다.
     
-    - **token_id**: 조회할 영화의 ID
+#     - **token_id**: 조회할 영화의 ID
+#     """
+#     token = db.query(Token).filter(Token.id == token_id).first()  # SQL: SELECT * FROM movies WHERE id = movie_id
+#     if token is None:  # 해당 ID의 영화가 없으면 404 에러 반환
+#         raise HTTPException(status_code=404, detail="Token not found")
+#     return token
+
+
+@router.get("/{token_id}", response_model=TokenDetail)
+async def read_token(
+    token_id: int = Path(...),
+    db: Session = Depends(get_db)
+):
     """
-    token = db.query(Token).filter(Token.id == token_id).first()  # SQL: SELECT * FROM movies WHERE id = movie_id
-    if token is None:  # 해당 ID의 영화가 없으면 404 에러 반환
-        raise HTTPException(status_code=404, detail="Token not found")
-    return token
+    토큰 + scripts + pitch.json + bgvoice presigned URL
+    """
+    token: Token | None = db.query(Token).filter(Token.id == token_id).first()
+    if token is None:
+        raise HTTPException(404, "Token not found")
+
+    pitch_data   = await load_json(token.s3_pitch_url)
+    safe_bgvoice = presign(token.s3_bgvoice_url)   # 퍼블릭이면 그대로
+
+    # SQLAlchemy 객체 dict 언패킹 + 추가 필드
+    return TokenDetail(
+        **token.__dict__,
+        scripts=[*token.scripts],    # relationship 로드
+        pitch=pitch_data,
+        bgvoice_url=safe_bgvoice
+    )
 
 # 영화 수정 API - PUT 요청으로 기존 영화 데이터를 업데이트
 @router.put("/{token_id}", response_model=TokenSchema)
