@@ -9,7 +9,6 @@ import httpx
 from database import get_db
 from sqlalchemy.orm import Session
 from models import Token
-from router.utils_s3 import presign
 
 async def get_token_by_id(token_id: str, db:Session):
     token = db.query(Token).filter(Token.id == int(token_id)).first()
@@ -64,8 +63,8 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
                     "s3_audio_url": s3_url,
                     "video_id": token_id,
                     "webhook_url": webhook_url,
-                    "s3_textgrid_url": presign(token_info.s3_textgrid_url) if token_info.s3_textgrid_url else None,
-                    "s3_pitch_url": presign(token_info.s3_pitch_url) if token_info.s3_pitch_url else None
+                    "s3_textgrid_url": f"s3://testgrid-pitch-bgvoice-yousync/{token_info.s3_textgrid_url}" if token_info.s3_textgrid_url else None,
+                    "s3_pitch_url": f"s3://testgrid-pitch-bgvoice-yousync/{token_info.s3_pitch_url}" if token_info.s3_pitch_url else None
 
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
@@ -110,7 +109,6 @@ async def upload_audio_by_token_id(
                 
                 s3_key = await upload_to_s3_async(file_data, file.filename)
                 s3_url = f"s3://{S3_BUCKET}/{s3_key}"
-                presigned_s3_url = presign(s3_url)
 
                 #token_info = await get_token_by_id(token_id, db)
                 
@@ -123,7 +121,7 @@ async def upload_audio_by_token_id(
                 # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
                 await send_analysis_request_async(
-                    presigned_s3_url,   # ← presigned URL로 변경
+                    s3_url, 
                     token_info.id, 
                     webhook_url, 
                     job_id,
