@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List ,Any
 from datetime import datetime
 
 # === Actor Schemas ===
@@ -22,6 +22,8 @@ class ScriptBase(BaseModel):
     end_time: float
     script: str
     translation: Optional[str] = None
+
+
 
 
 class ScriptCreate(ScriptBase):
@@ -55,6 +57,15 @@ class Token(TokenBase):
     
     class Config:
         from_attributes = True
+
+class TokenDetail(TokenBase):
+    id: int
+    pitch: Optional[Any] = None         # pitch.json 딕셔너리
+    bgvoice_url: Optional[str] = None   # presigned URL 또는 퍼블릭 URL
+    scripts: List[Script] = []
+
+    class Config:
+        orm_mode = True       
 
 # === MovieActor Schemas ===
 class MovieActorBase(BaseModel):
