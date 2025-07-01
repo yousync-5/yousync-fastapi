@@ -7,6 +7,7 @@ class Token(Base):
     __tablename__ = "tokens"  # 토큰 단위 (token_id)
 
     id = Column(Integer, primary_key=True, index=True)  # token_id
+    video_id = Column(String, nullable=True)  
     token_name = Column(String, nullable=False)
     actor_name = Column(String, nullable=False)
     category = Column(String, nullable=True)
@@ -54,3 +55,22 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+
+class AnalysisResult(Base):
+    __tablename__ = "analysis_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, unique=True, index=True)
+    token_id = Column(Integer, ForeignKey("tokens.id"), nullable=False)
+    status = Column(String, nullable=False)
+    progress = Column(Integer, nullable=False)
+    result = Column(JSON, nullable=True)  # analysis_results 점수만 저장
+    message = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    token = relationship("Token")
+
+# Token 에 역참조(optional)
+Token.analysis_results = relationship(
+    "AnalysisResult", back_populates="token", cascade="all, delete"
+)
