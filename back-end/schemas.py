@@ -60,12 +60,12 @@ class Token(TokenBase):
 
 class TokenDetail(TokenBase):
     id: int
-    pitch: Optional[Any] = None         # pitch.json 딕셔너리
     bgvoice_url: Optional[str] = None   # presigned URL 또는 퍼블릭 URL
+    pitch: Optional[Any] = None         # pitch.json 딕셔너리
     scripts: List[Script] = []
 
     class Config:
-        orm_mode = True       
+        orm_mode = True   
 
 # === MovieActor Schemas ===
 class MovieActorBase(BaseModel):
