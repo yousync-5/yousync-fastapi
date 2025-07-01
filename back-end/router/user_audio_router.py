@@ -120,7 +120,7 @@ async def upload_audio_by_token_id(
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
                 await send_analysis_request_async(
                     s3_url, 
-                    token_info.video_id, 
+                    token_info.id, 
                     webhook_url, 
                     job_id,
                     token_info
