@@ -40,19 +40,6 @@ def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     tokens = db.query(Token).offset(skip).limit(limit).all()  # SQL: SELECT * FROM movies LIMIT 100 OFFSET 0
     return tokens
 
-# 특정 영화 조회 API - ID로 하나의 영화만 가져오기
-# @router.get("/{token_id}", response_model=TokenSchema)
-# def read_token(token_id: int, db: Session = Depends(get_db)):
-#     """
-#     특정 ID의 토큰을 조회합니다.
-    
-#     - **token_id**: 조회할 영화의 ID
-#     """
-#     token = db.query(Token).filter(Token.id == token_id).first()  # SQL: SELECT * FROM movies WHERE id = movie_id
-#     if token is None:  # 해당 ID의 영화가 없으면 404 에러 반환
-#         raise HTTPException(status_code=404, detail="Token not found")
-#     return token
-
 
 @router.get("/{token_id}", response_model=TokenDetail)
 async def read_token(
