@@ -42,14 +42,6 @@ def update_analysis_result(db: Session, job_id: str, **kwargs):
 def get_analysis_result(db: Session, job_id: str):
     return db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
 
-# boto3로 업로드 함수 구현, 추후 분리 가능 boto3를 import
-s3 = boto3.client(
-    "s3",
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name=os.getenv("AWS_REGION")
-)
-
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
 
@@ -64,12 +56,12 @@ TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://54.180.25.231:8000/analyze-v
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app/tokens/webhook/analysis-complete")
 
 # 비동기 S3 업로드 함수
-async def upload_to_s3_async(file_data: bytes, filename: str) -> str:
+async def upload_to_s3_async(s3_client, file_data: bytes, filename: str) -> str:
     """비동기 S3 업로드"""
     def sync_upload():
         import io
         key = f"audio/{uuid4().hex}_{filename}"
-        s3.upload_fileobj(io.BytesIO(file_data), S3_BUCKET, key)
+        s3_client.upload_fileobj(io.BytesIO(file_data), S3_BUCKET, key)
         return key
     
     loop = asyncio.get_event_loop()
@@ -102,6 +94,7 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
 # 1. 오디오 업로드 및 분석 요청 (완전 비동기 처리)
 @router.post("/{token_id}/upload-audio")
 async def upload_audio_by_token_id(
+    request: Request,
     token_id: str = Path(...),
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -109,6 +102,7 @@ async def upload_audio_by_token_id(
     
 ):
     try:
+        s3_client = request.app.state.s3_client
         job_id = str(uuid4())
         file_data = await file.read()
         token_info = await get_token_by_id(token_id, db)
@@ -117,7 +111,7 @@ async def upload_audio_by_token_id(
         analysis_result = create_analysis_result(db, job_id, int(token_id))
 
         # 백그라운드에서 완전 비동기 처리
-        async def process_in_background():
+        async def process_in_background(s3_client_bg):
             # 새로운 DB 세션 생성 (백그라운드 작업용)
             from database import SessionLocal
             bg_db = SessionLocal()
@@ -125,7 +119,7 @@ async def upload_audio_by_token_id(
                 # S3 업로드
                 update_analysis_result(bg_db, job_id, progress=40, message="S3 업로드 중...")
                 
-                s3_key = await upload_to_s3_async(file_data, file.filename)
+                s3_key = await upload_to_s3_async(s3_client_bg, file_data, file.filename)
                 s3_url = f"s3://{S3_BUCKET}/{s3_key}"
                 
                 update_analysis_result(bg_db, job_id, progress=70, message="분석 서버 요청 중...")
@@ -148,7 +142,7 @@ async def upload_audio_by_token_id(
             finally:
                 bg_db.close()
 
-        background_tasks.add_task(process_in_background)
+        background_tasks.add_task(process_in_background, s3_client)
         
         return {
             "message": "업로드 완료, 백그라운드에서 처리됩니다.",

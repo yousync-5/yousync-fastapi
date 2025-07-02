@@ -17,17 +17,35 @@ class Token(Base):
     s3_textgrid_url = Column(Text, nullable=True)
     s3_pitch_url = Column(Text, nullable=True)
     s3_bgvoice_url = Column(Text, nullable=True)
-    youtube_url  = Column(Text, nullable=True)
+    youtube_url = Column(
+        Text,
+        ForeignKey("urls.youtube_url", ondelete="CASCADE"),  # 핵심!
+        nullable=False,
+        index=True,
+    )
     # 관계
+    url = relationship("URL", back_populates="tokens")
     scripts = relationship("Script",
                         back_populates="token",
                         cascade="all, delete",
                         passive_deletes=True)          # ✅   
     
-    # analysis_results = relationship("AnalysisResult",
-    #                             back_populates="token",
-    #                             cascade="all, delete",
-    #                             passive_deletes=True) # ✅
+
+class URL(Base):
+    __tablename__ = "urls"
+    youtube_url = Column(Text, primary_key=True)   
+    actor_id    = Column(Integer,
+                         ForeignKey("actors.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+
+
+    actor  = relationship("Actor", back_populates="urls")
+    tokens = relationship("Token",
+                          back_populates="url",
+                          cascade="all, delete",
+                          passive_deletes=True)
+
+
 
 class Actor(Base):
     __tablename__ = "actors"
@@ -36,7 +54,11 @@ class Actor(Base):
     name = Column(String, unique=True, nullable=False, index=True)
     
     # 관계
-    # scripts = relationship("Script", back_populates="actor")
+    urls = relationship("URL",
+                        back_populates="actor",
+                        cascade="all, delete",
+                        passive_deletes=True)
+
 
 
 class Script(Base):
@@ -92,13 +114,6 @@ class ScriptWord(Base):
 
 
 
-
-# class MovieActor(Base):
-#     __tablename__ = "movie_actors"
-    
-#     movie_id = Column(Integer, ForeignKey("movies.id"), primary_key=True)
-#     actor_id = Column(Integer, ForeignKey("actors.id"), primary_key=True)
-
 class User(Base):
     __tablename__ = "users"
     
@@ -106,6 +121,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+
 
 
 class AnalysisResult(Base):
@@ -122,4 +138,3 @@ class AnalysisResult(Base):
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-    token = relationship("Token")   # 단순 단방향

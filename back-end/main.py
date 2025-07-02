@@ -17,7 +17,9 @@ API 문서 접근:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+import boto3
+import os
 
 # 데이터베이스 관련 임포트
 from database import engine
@@ -32,13 +34,36 @@ from router.user_audio_router import router as user_audio_router
 # 데이터베이스 테이블 생성 (앱 시작시 자동으로 테이블이 생성됨)
 Base.metadata.create_all(bind=engine)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 앱 시작 시 실행될 코드
+    print("🚀 FastAPI 애플리케이션을 시작합니다...")
+    
+    # .env 파일이 로드된 후, S3 클라이언트를 안전하게 생성
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_REGION", "ap-northeast-2") # 안전한 기본값 설정
+    )
+    
+    # 생성된 클라이언트를 앱 상태(state)에 저장하여 어디서든 접근 가능하게 함
+    app.state.s3_client = s3_client
+    
+    yield # --- 이 지점에서 애플리케이션이 실행됨 ---
+    
+    # 앱 종료 시 실행될 코드 (정리 작업)
+    print("👋 FastAPI 애플리케이션을 종료합니다.")
+
+
 # FastAPI 애플리케이션 인스턴스 생성
 app = FastAPI(
     title="영화/스크립트 관리 API",
     description="영화와 스크립트 데이터를 관리하는 REST API 서버입니다.",
     version="1.0.0",
     docs_url="/docs",      # Swagger UI 경로
-    redoc_url="/redoc"     # ReDoc 경로
+    redoc_url="/redoc",     # ReDoc 경로
+    lifespan=lifespan
 )
 
 
