@@ -177,4 +177,6 @@ curl -N http://localhost:8000/tokens/analysis-progress/{job_id}
 - [ ] 모니터링 및 로깅 개선
 
 
-하잇ㅇ하잇
+해야할일
+- 디비 테이블 추가(정민이형 요청)
+- 로그인 회원가입 추가
