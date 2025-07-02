@@ -29,7 +29,7 @@ def create_token(token: TokenCreate, db: Session = Depends(get_db)):
     return db_token
 
 # 모든 영화 조회 API - 페이지네이션 지원
-@router.get("/", response_model=List[TokenCreate])
+@router.get("/", response_model=List[TokenSchema])
 def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     모든 토큰 목록을 조회합니다.
