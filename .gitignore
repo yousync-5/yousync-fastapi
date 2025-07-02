@@ -1,6 +1,6 @@
 # .gitignore
 # Python
-__pycache__/
+back-end/__pycache__/
 *.py[cod]
 *.so
 *.egg

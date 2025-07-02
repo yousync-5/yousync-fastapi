@@ -41,8 +41,6 @@ app = FastAPI(
     redoc_url="/redoc"     # ReDoc 경로
 )
 
-#정적 파일 mount
-app.mount("/media", StaticFiles(directory="media"), name="media") 
 
 # CORS 미들웨어 설정 - 프론트엔드에서 API 호출을 허용하기 위함
 app.add_middleware(
