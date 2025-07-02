@@ -36,5 +36,8 @@ alembic/versions/*.pyc
 *.out
 logs/
 
+back-end/venv
 # OS / 기타
 Thumbs.db
+
+back-end/.env
