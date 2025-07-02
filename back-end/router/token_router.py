@@ -1,5 +1,5 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
-from fastapi import APIRouter, Depends, HTTPException,Path
+from fastapi import APIRouter, Depends, HTTPException,Path, Request
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -43,18 +43,20 @@ def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 @router.get("/{token_id}", response_model=TokenDetail)
 async def read_token(
+    request: Request,
     token_id: int = Path(...),
     db: Session = Depends(get_db)
 ):
     """
     토큰 + scripts + pitch.json + bgvoice presigned URL
     """
+    s3_client = request.app.state.s3_client
     token: Token | None = db.query(Token).filter(Token.id == token_id).first()
     if token is None:
         raise HTTPException(404, "Token not found")
 
-    pitch_data   = await load_json(token.s3_pitch_url)
-    safe_bgvoice = presign(token.s3_bgvoice_url)   # 퍼블릭이면 그대로
+    pitch_data   = await load_json(s3_client, token.s3_pitch_url)
+    safe_bgvoice = presign(s3_client, token.s3_bgvoice_url)   # 퍼블릭이면 그대로
 
     # SQLAlchemy 객체 dict 언패킹 + 추가 필드
     return TokenDetail(
