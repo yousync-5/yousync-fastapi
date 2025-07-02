@@ -71,7 +71,7 @@ class TokenCreate(TokenBase):
 
 class Token(TokenBase):
     id: int
-    scripts: List[Script] = []  # 영화에 속한 스크립트 목록
+    # scripts: List[Script] = []  # 영화에 속한 스크립트 목록
     
     class Config:
         from_attributes = True
