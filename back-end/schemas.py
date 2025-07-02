@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List ,Any
 from datetime import datetime
 
+
 # === Actor Schemas ===
 class ActorBase(BaseModel):
     name: str
@@ -14,6 +15,10 @@ class Actor(ActorBase):
     
     class Config:
         from_attributes = True
+
+
+
+
 
 
 # === ScriptWord ===
@@ -31,6 +36,10 @@ class ScriptWord(ScriptWordBase):
     class Config:
         from_attributes = True
  
+
+
+
+
 
 # === Script Schemas ===
 class ScriptBase(BaseModel):
@@ -52,6 +61,9 @@ class Script(ScriptBase):
     
     class Config:
         from_attributes = True
+
+
+
 
 
 # === Token Schemas ===
@@ -85,19 +97,10 @@ class TokenDetail(TokenBase):
     class Config:
         from_attributes = True   
 
-# === MovieActor Schemas ===
-class MovieActorBase(BaseModel):
-    movie_id: int
-    actor_id: int
 
-class MovieActorCreate(MovieActorBase):
-    pass
 
-class MovieActor(MovieActorBase):
-    actor: Optional[Actor] = None
-    
-    class Config:
-        from_attributes = True
+
+
 
 # === User Schemas ===
 class UserBase(BaseModel):
