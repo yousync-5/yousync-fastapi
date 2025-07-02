@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List ,Any
 from datetime import datetime
 
@@ -15,6 +15,23 @@ class Actor(ActorBase):
     class Config:
         from_attributes = True
 
+
+# === ScriptWord ===
+class ScriptWordBase(BaseModel):
+    script_id: int # script_id를 기반으로 연결
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    word: Optional[str] = None
+    probability: Optional[float] = None
+
+
+class ScriptWord(ScriptWordBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+ 
+
 # === Script Schemas ===
 class ScriptBase(BaseModel):
     token_id: int  # ✅ 변경: token_id를 기반으로 연결
@@ -24,17 +41,18 @@ class ScriptBase(BaseModel):
     translation: Optional[str] = None
 
 
-
-
 class ScriptCreate(ScriptBase):
     pass
+
 
 class Script(ScriptBase):
     id: int
     # actor: Optional[Actor] = None  # 배우 정보 포함
+    words: List[ScriptWord] = Field(default_factory=list)
     
     class Config:
         from_attributes = True
+
 
 # === Token Schemas ===
 class TokenBase(BaseModel):
@@ -62,10 +80,10 @@ class TokenDetail(TokenBase):
     id: int
     bgvoice_url: Optional[str] = None   # presigned URL 또는 퍼블릭 URL
     pitch: Optional[Any] = None         # pitch.json 딕셔너리
-    scripts: List[Script] = []
+    scripts: List[Script] = Field(default_factory=list)
 
     class Config:
-        orm_mode = True   
+        from_attributes = True   
 
 # === MovieActor Schemas ===
 class MovieActorBase(BaseModel):

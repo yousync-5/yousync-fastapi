@@ -89,7 +89,6 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
                     "webhook_url": webhook_url,
                     "s3_textgrid_url": f"s3://testgrid-pitch-bgvoice-yousync/{token_info.s3_textgrid_url}" if token_info.s3_textgrid_url else None,
                     "s3_pitch_url": f"s3://testgrid-pitch-bgvoice-yousync/{token_info.s3_pitch_url}" if token_info.s3_pitch_url else None
-
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
@@ -252,7 +251,7 @@ async def stream_analysis_progress(job_id: str):
                 finally:
                     db.close()
                     
-                await asyncio.sleep(1)  # 1초마다 업데이트
+                await asyncio.sleep(3)  # 1초마다 업데이트
                 
             except Exception as e:
                 logging.error(f"SSE 스트림 오류: {e}")

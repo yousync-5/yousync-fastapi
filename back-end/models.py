@@ -19,8 +19,15 @@ class Token(Base):
     s3_bgvoice_url = Column(Text, nullable=True)
     youtube_url  = Column(Text, nullable=True)
     # 관계
-    scripts = relationship("Script", back_populates="token", cascade="all, delete")
-    analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
+    scripts = relationship("Script",
+                        back_populates="token",
+                        cascade="all, delete",
+                        passive_deletes=True)          # ✅   
+    
+    # analysis_results = relationship("AnalysisResult",
+    #                             back_populates="token",
+    #                             cascade="all, delete",
+    #                             passive_deletes=True) # ✅
 
 class Actor(Base):
     __tablename__ = "actors"
@@ -31,17 +38,60 @@ class Actor(Base):
     # 관계
     # scripts = relationship("Script", back_populates="actor")
 
+
 class Script(Base):
     __tablename__ = "scripts"  # 문장 단위
 
     id = Column(Integer, primary_key=True, index=True)  # 문장 고유 ID
-    token_id = Column(Integer, ForeignKey("tokens.id"), nullable=False) # token_id와 연결
+    token_id = Column(
+        Integer,
+        ForeignKey("tokens.id", ondelete="CASCADE"),   # ✅ DB-레벨 연쇄 삭제
+        nullable=False,
+        index=True,
+    )    
+    
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     script = Column(Text, nullable=False)
     translation = Column(Text, nullable=True)
 
-    token = relationship("Token", back_populates="scripts")
+    token = relationship(
+        "Token",
+        back_populates="scripts",
+        passive_deletes=True,                         # ✅ DB에 맡긴다
+    )    
+    words = relationship(
+        "ScriptWord",
+        back_populates="script",
+        cascade="all, delete",
+        passive_deletes=True,            # ➕
+    )
+
+
+class ScriptWord(Base):
+    __tablename__ = "words"
+
+    id = Column(Integer, primary_key=True, index=True)
+    script_id = Column(
+        Integer,
+        ForeignKey("scripts.id", ondelete="CASCADE"),  # ← 핵심
+        nullable=False,
+        index=True,
+    )
+    word = Column(String)
+    start_time = Column(Float)
+    end_time = Column(Float)
+    probability = Column(Float)
+
+    # 관계 설정
+    script = relationship(
+        "Script",
+        back_populates="words",
+        passive_deletes=True,           # DB가 직접 삭제하도록
+    )
+
+
+
 
 # class MovieActor(Base):
 #     __tablename__ = "movie_actors"
@@ -57,16 +107,19 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
 
+
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(String, unique=True, index=True)
-    token_id = Column(Integer, ForeignKey("tokens.id"), nullable=False)
+    token_id = Column(Integer,
+                  ForeignKey("tokens.id", ondelete="CASCADE"),
+                  nullable=False)
     status = Column(String, nullable=False)
     progress = Column(Integer, nullable=False)
     result = Column(JSON, nullable=True)  # analysis_results 점수만 저장
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-    token = relationship("Token", back_populates="analysis_results")
+    token = relationship("Token")   # 단순 단방향
