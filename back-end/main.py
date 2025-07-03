@@ -29,6 +29,7 @@ from models import Base
 from router.script_router import router as script_router
 from router.token_router import router as token_router
 from router.user_audio_router import router as user_audio_router
+from router.auth_router import router as auth_router
 # from router.actor_router import router as actor_router
 
 # 데이터베이스 테이블 생성 (앱 시작시 자동으로 테이블이 생성됨)
@@ -37,7 +38,7 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 실행될 코드
-    print("🚀 FastAPI 애플리케이션을 시작합니다...")
+    print("FastAPI 애플리케이션 시작...")
     
     # .env 파일이 로드된 후, S3 클라이언트를 안전하게 생성
     s3_client = boto3.client(
@@ -53,7 +54,7 @@ async def lifespan(app: FastAPI):
     yield # --- 이 지점에서 애플리케이션이 실행됨 ---
     
     # 앱 종료 시 실행될 코드 (정리 작업)
-    print("👋 FastAPI 애플리케이션을 종료합니다.")
+    print("FastAPI 애플리케이션 종료.")
 
 
 # FastAPI 애플리케이션 인스턴스 생성
@@ -77,6 +78,7 @@ app.add_middleware(
 )
 
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
+app.include_router(auth_router)    # /auth 경로로 인증 관련 API 등록
 app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
 app.include_router(token_router)   # /tokens 경로로 토큰 관련 API 등록
 app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록

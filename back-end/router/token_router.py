@@ -5,7 +5,7 @@ from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
-from models import Token
+from models import Token, Actor, TokenActor
 from schemas import Token as TokenSchema
 from schemas import TokenCreate,TokenDetail
 from .utils_s3 import load_json, presign
@@ -111,11 +111,11 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
 #     tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
 #     return tokens
 
-# 배우별 영화 조회 API - MovieActor 관계 테이블을 통해 조회
+# 배우별 영화 조회 API - TokenActor 관계 테이블을 통해 조회
 # @router.get("/actor/{actor_name}", response_model=List[TokenSchema])
-# def read_movies_by_actor(actor_name: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+# def read_tokens_by_actor(actor_name: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 #     """
-#     특정 배우가 출연한 영화들을 조회합니다.
+#     특정 배우가 출연한 Token들을 조회합니다.
     
 #     - **actor_name**: 조회할 배우명
 #     - **skip**: 건너뛸 항목 수 (기본값: 0)
@@ -126,6 +126,33 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
 #     if not actor:
 #         return []
     
-#     # MovieActor 관계 테이블을 통해 영화 조회
-#     movies = db.query(Movie).join(MovieActor).filter(MovieActor.actor_id == actor.id).offset(skip).limit(limit).all()
-#     return movies
+#     # TokenActor 관계 테이블을 통해 Token 조회
+#     tokens = db.query(Token).join(TokenActor, TokenActor.token_id == Token.id).filter(TokenActor.actor_id == actor.id).offset(skip).limit(limit).all()
+#     return tokens
+
+@router.get("/actor/{actor_name}", response_model=List[TokenSchema])
+def read_tokens_by_actor(
+        actor_name: str,
+        skip: int = 0, limit: int = 100,
+        db: Session = Depends(get_db)
+):
+    q = actor_name.strip()
+    if not q:
+        return []
+
+    # ① 여러 배우 전부 찾기 (부분 + 대소문자 무시)
+    actors = (db.query(Actor)
+                .filter(Actor.name.ilike(f"%{q}%"))
+                .limit(5)
+                .all())
+    if not actors:
+        return []
+
+    actor_ids = [a.id for a in actors]
+
+    # ② 토큰 조회
+    tokens = (db.query(Token)
+                .join(TokenActor, TokenActor.token_id == Token.id)
+                .filter(TokenActor.actor_id.in_(actor_ids))
+                .offset(skip).limit(limit).all())
+    return tokens
