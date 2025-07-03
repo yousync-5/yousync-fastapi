@@ -92,7 +92,6 @@ class TokenDetail(TokenBase):
 
 
 
-# === User Schemas ===
 
 class GoogleLoginRequest(BaseModel):
     id_token: str
@@ -102,7 +101,7 @@ class UserResponse(BaseModel):
     """사용자 정보 응답 스키마 (비밀번호 제외)"""
     id: int
     email: str
-    name: Optional[str] = None
+    full_name: Optional[str] = None
     profile_picture: Optional[str] = None
     login_type: str = "email"
     created_at: datetime
