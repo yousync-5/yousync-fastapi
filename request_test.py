@@ -4,7 +4,7 @@ import requests
 data = {
     "s3_audio_url": "s3://jungle-youtube-downloader-20250627/user_taken.wav",
     "video_id": "jZOywn1qArI",
-    "webhook_url": "https://httpbin.org/post"
+    "webhook_url": "http://3.39.231.196/tokens/webhook/analysis-complete"
 }
 
 headers = {

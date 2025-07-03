@@ -54,7 +54,7 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_REGION=your_aws_region
 S3_BUCKET_NAME=your_s3_bucket_name
 TARGET_SERVER_URL=http://your-analysis-server/analyze-voice
-WEBHOOK_URL=https://your-domain/tokens/webhook/analysis-complete
+WEBHOOK_URL=http://3.39.231.196/tokens/webhook/analysis-complete
 DATABASE_URL=postgresql://username:password@localhost/dbname
 ```
 
