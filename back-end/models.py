@@ -38,6 +38,13 @@ class Token(Base):
         passive_deletes=True
     )
 
+    bookmarked_by = relationship(
+        "Bookmark",
+        back_populates="token",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    
     analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
 
     
@@ -184,12 +191,16 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
-    # 사용자 선호도 조사
-
+    bookmarks = relationship(
+        "Bookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    
+# 사용자 선호도 조사
 # 사용자 id - AnlysisResult
 # 사용자 id - 북마크
-
-
 
 
 class AnalysisResult(Base):
@@ -207,3 +218,29 @@ class AnalysisResult(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     token = relationship("Token", back_populates="analysis_results") #??
+
+
+
+class Bookmark(Base):
+    """
+    (user_id, token_id) 복합 Primary Key
+    → 같은 토큰을 중복 북마크하지 못하도록 보장
+    """
+    __tablename__ = "bookmarks"
+
+    user_id  = Column(Integer,
+                      ForeignKey("users.id", ondelete="CASCADE"),
+                      primary_key=True,
+                      index=True)
+    token_id = Column(Integer,
+                      ForeignKey("tokens.id", ondelete="CASCADE"),
+                      primary_key=True,
+                      index=True)
+
+    created_at = Column(DateTime,
+                        server_default=func.now(),
+                        nullable=False)
+
+    # 양방향 편의를 위한 관계
+    user  = relationship("User",  back_populates="bookmarks", passive_deletes=True)
+    token = relationship("Token", back_populates="bookmarked_by", passive_deletes=True)
