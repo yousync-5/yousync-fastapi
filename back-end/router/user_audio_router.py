@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 from database import get_db
 from sqlalchemy.orm import Session
-from models import Token, AnalysisResult
+from models import Token, AnalysisResult, User
 
 async def get_token_by_id(token_id: str, db:Session):
     token = db.query(Token).filter(Token.id == int(token_id)).first()
@@ -41,6 +41,16 @@ def update_analysis_result(db: Session, job_id: str, **kwargs):
 
 def get_analysis_result(db: Session, job_id: str):
     return db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
+
+# # boto3로 업로드 함수 구현, 추후 분리 가능 boto3를 import
+# s3 = boto3.client(
+#     "s3",
+#     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+#     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+#     region_name=os.getenv("AWS_REGION")
+# )
+
+
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
@@ -98,7 +108,8 @@ async def upload_audio_by_token_id(
     token_id: str = Path(...),
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    #current_user: User = Depends(get_current_user)  # 🔐 로그인한 사용자만 호출 가능
     
 ):
     try:
