@@ -209,15 +209,12 @@ async def google_login(
                     google_id=google_id,
                     login_type="google",
                     profile_picture=profile_picture,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
                 )
                 db.add(user)
         else:
             # 기존 구글 사용자 - 프로필 정보 업데이트
             user.full_name = full_name
             user.profile_picture = profile_picture
-            user.updated_at = datetime.utcnow()
         
         db.commit()
         db.refresh(user)
@@ -267,7 +264,7 @@ async def get_current_user_info(
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
-        name=current_user.name,
+        full_name=current_user.full_name,
         profile_picture=current_user.profile_picture,
         login_type=current_user.login_type,
         created_at=current_user.created_at,
