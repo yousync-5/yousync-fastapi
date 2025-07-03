@@ -30,12 +30,16 @@ class Token(Base):
                         cascade="all, delete",
                         passive_deletes=True)          # ✅   
 
+
     token_actors = relationship(
         "TokenActor",
         back_populates="token",
         cascade="all, delete",     # Token 삭제→ TokenActor 삭제
         passive_deletes=True
     )
+
+    analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
+
     
 
 class URL(Base):
@@ -141,6 +145,23 @@ class TokenActor(Base):
 
 
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=True)  # 소셜 로그인 시에는 null
+    
+    # 소셜 로그인 관련 필드
+    google_id = Column(String, unique=True, index=True, nullable=True)
+    profile_picture = Column(String, nullable=True)
+    full_name = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    login_type = Column(String, default="email")  # "email" or "google"
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 
@@ -158,16 +179,4 @@ class AnalysisResult(Base):
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-
-
-
-
-
+    token = relationship("Token", back_populates="analysis_results") #??
