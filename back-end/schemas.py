@@ -18,9 +18,6 @@ class Actor(ActorBase):
 
 
 
-
-
-
 # === ScriptWord ===
 class ScriptWordBase(BaseModel):
     script_id: int # script_id를 기반으로 연결
@@ -36,8 +33,6 @@ class ScriptWord(ScriptWordBase):
     class Config:
         from_attributes = True
  
-
-
 
 
 
@@ -61,8 +56,6 @@ class Script(ScriptBase):
     
     class Config:
         from_attributes = True
-
-
 
 
 
@@ -96,8 +89,6 @@ class TokenDetail(TokenBase):
 
     class Config:
         from_attributes = True   
-
-
 
 
 

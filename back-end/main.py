@@ -37,7 +37,7 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 실행될 코드
-    print("🚀 FastAPI 애플리케이션을 시작합니다...")
+    print("FastAPI 애플리케이션 시작...")
     
     # .env 파일이 로드된 후, S3 클라이언트를 안전하게 생성
     s3_client = boto3.client(
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     yield # --- 이 지점에서 애플리케이션이 실행됨 ---
     
     # 앱 종료 시 실행될 코드 (정리 작업)
-    print("👋 FastAPI 애플리케이션을 종료합니다.")
+    print("FastAPI 애플리케이션 종료.")
 
 
 # FastAPI 애플리케이션 인스턴스 생성

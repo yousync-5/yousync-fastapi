@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -29,6 +29,13 @@ class Token(Base):
                         back_populates="token",
                         cascade="all, delete",
                         passive_deletes=True)          # ✅   
+
+    token_actors = relationship(
+        "TokenActor",
+        back_populates="token",
+        cascade="all, delete",     # Token 삭제→ TokenActor 삭제
+        passive_deletes=True
+    )
     
 
 class URL(Base):
@@ -59,6 +66,12 @@ class Actor(Base):
                         cascade="all, delete",
                         passive_deletes=True)
 
+    token_actors = relationship(
+        "TokenActor",
+        back_populates="actor",
+        cascade="all, delete",     # Actor 삭제→ TokenActor 삭제
+        passive_deletes=True
+    )
 
 
 class Script(Base):
@@ -113,14 +126,21 @@ class ScriptWord(Base):
     )
 
 
+class TokenActor(Base):
+    __tablename__ = "token_actors"
+    id       = Column(Integer, primary_key=True, index=True)
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("actors.id", ondelete="CASCADE"), nullable=False, index=True)
 
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    __table_args__ = (
+        UniqueConstraint("token_id", "actor_id", name="uq_token_actor"),
+    )
+
+    token = relationship("Token", back_populates="token_actors", passive_deletes=True)
+    actor = relationship("Actor", back_populates="token_actors", passive_deletes=True)
+
+
+
 
 
 
@@ -137,4 +157,17 @@ class AnalysisResult(Base):
     result = Column(JSON, nullable=True)  # analysis_results 점수만 저장
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+
+
+
+
 

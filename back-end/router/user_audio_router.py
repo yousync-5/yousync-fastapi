@@ -10,6 +10,7 @@ from database import get_db
 from sqlalchemy.orm import Session
 from models import Token, AnalysisResult
 
+
 async def get_token_by_id(token_id: str, db:Session):
     token = db.query(Token).filter(Token.id == int(token_id)).first()
     if not token:
@@ -43,7 +44,6 @@ def get_analysis_result(db: Session, job_id: str):
     return db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
-
 
 # ===============================================
 
