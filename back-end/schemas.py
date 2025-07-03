@@ -38,7 +38,7 @@ class ScriptWord(ScriptWordBase):
 
 # === Script Schemas ===
 class ScriptBase(BaseModel):
-    token_id: int  # ✅ 변경: token_id를 기반으로 연결
+    token_id: int  #  변경: token_id를 기반으로 연결
     start_time: float
     end_time: float
     script: str
@@ -93,38 +93,9 @@ class TokenDetail(TokenBase):
 
 
 # === User Schemas ===
-class UserBase(BaseModel):
-    email: str
-    username: Optional[str] = None
-    full_name: Optional[str] = None
-
-class UserCreate(UserBase):
-    password: Optional[str] = None
-
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
 
 class GoogleLoginRequest(BaseModel):
     id_token: str
-
-
-class User(UserBase):
-    id: int
-    google_id: Optional[str] = None
-    profile_picture: Optional[str] = None
-    is_active: bool = True
-    login_type: str = "email"
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-class UserInDB(User):
-    hashed_password: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -144,20 +115,3 @@ class AuthToken(BaseModel):
     """인증 토큰 스키마"""
     access_token: str
     token_type: str
-
-
-
-
-# === User Schemas ===
-class UserBase(BaseModel):
-    username: str
-    email: str
-
-class UserCreate(UserBase):
-    password: str
-
-class User(UserBase):
-    id: int
-    
-    class Config:
-        from_attributes = True

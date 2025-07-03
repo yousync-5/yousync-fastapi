@@ -114,7 +114,6 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
 
 
 # 배우별 영화 조회 API - TokenActor 관계 테이블을 통해 조회
-
 SIM_TH = 0.25                # 유사도 임계값 조정 가능
 
 @router.get("/actor/{query}", response_model=List[TokenSchema])
