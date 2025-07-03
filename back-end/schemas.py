@@ -90,6 +90,8 @@ class TokenDetail(TokenBase):
     class Config:
         from_attributes = True   
 
+
+
 # === User Schemas ===
 class UserBase(BaseModel):
     email: str
@@ -99,12 +101,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: Optional[str] = None
 
+
 class UserLogin(BaseModel):
     email: str
     password: str
 
+
 class GoogleLoginRequest(BaseModel):
     id_token: str
+
 
 class User(UserBase):
     id: int
@@ -117,8 +122,10 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+
 class UserInDB(User):
     hashed_password: Optional[str] = None
+
 
 class UserResponse(BaseModel):
     """사용자 정보 응답 스키마 (비밀번호 제외)"""

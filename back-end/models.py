@@ -57,7 +57,6 @@ class URL(Base):
                           passive_deletes=True)
 
 
-
 class Actor(Base):
     __tablename__ = "actors"
     
@@ -76,6 +75,30 @@ class Actor(Base):
         cascade="all, delete",     # Actor 삭제→ TokenActor 삭제
         passive_deletes=True
     )
+
+        # ★ 별칭 목록
+    aliases = relationship(
+        "ActorAlias",
+        back_populates="actor",
+        cascade="all, delete-orphan",   # 배우 삭제 시 별칭도 삭제
+        passive_deletes=True
+    )
+
+
+class ActorAlias(Base):
+    __tablename__ = "actor_aliases"
+    
+    id       = Column(Integer, primary_key=True)
+    actor_id = Column(Integer, ForeignKey("actors.id", ondelete="CASCADE"),
+                      nullable=False, index=True)
+    name     = Column(String, nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint("actor_id", "name", name="uq_actor_alias"),
+    )
+
+    actor = relationship("Actor", back_populates="aliases")
+
 
 
 class Script(Base):
@@ -162,6 +185,12 @@ class User(Base):
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 사용자 선호도 조사
+
+# 사용자 id - AnlysisResult
+# 사용자 id - 북마크
+
 
 
 
