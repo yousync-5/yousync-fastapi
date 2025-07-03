@@ -110,18 +110,3 @@
 #     db.delete(db_actor)
 #     db.commit()
 #     return {"detail": "Actor deleted successfully"}
-
-# # 배우가 출연한 영화 목록 조회 API
-# @router.get("/{actor_id}/movies")
-# def read_actor_movies(actor_id: int, db: Session = Depends(get_db)):
-#     """
-#     특정 배우가 출연한 영화 목록을 조회합니다.
-    
-#     - **actor_id**: 조회할 배우의 ID
-#     """
-#     actor = db.query(Actor).filter(Actor.id == actor_id).first()
-#     if not actor:
-#         raise HTTPException(status_code=404, detail="Actor not found")
-    
-#     movies = db.query(Movie).join(MovieActor).filter(MovieActor.actor_id == actor_id).all()
-#     return movies
