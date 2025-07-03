@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List ,Any
+from typing import Optional, List, Any
 from datetime import datetime
 
 
@@ -92,7 +92,7 @@ class TokenDetail(TokenBase):
 
 
 
-
+# === User Schemas ===
 class GoogleLoginRequest(BaseModel):
     id_token: str
 
@@ -114,3 +114,23 @@ class AuthToken(BaseModel):
     """인증 토큰 스키마"""
     access_token: str
     token_type: str
+
+
+
+# === Bookmark Schemas ===
+class BookmarkCreate(BaseModel):
+    token_id: int = Field(..., ge=1)
+
+class BookmarkOut(BaseModel):
+    token_id: int
+
+    class Config:
+        from_attributes = True
+
+class BookmarkListOut(BaseModel):
+    id: int
+    token: Token
+
+    class Config:
+        from_attributes = True
+        
