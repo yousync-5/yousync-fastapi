@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, Boolean, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -29,7 +29,17 @@ class Token(Base):
                         back_populates="token",
                         cascade="all, delete",
                         passive_deletes=True)          # ✅   
+
+
+    token_actors = relationship(
+        "TokenActor",
+        back_populates="token",
+        cascade="all, delete",     # Token 삭제→ TokenActor 삭제
+        passive_deletes=True
+    )
+
     analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
+
     
 
 class URL(Base):
@@ -60,6 +70,12 @@ class Actor(Base):
                         cascade="all, delete",
                         passive_deletes=True)
 
+    token_actors = relationship(
+        "TokenActor",
+        back_populates="actor",
+        cascade="all, delete",     # Actor 삭제→ TokenActor 삭제
+        passive_deletes=True
+    )
 
 
 class Script(Base):
@@ -112,6 +128,20 @@ class ScriptWord(Base):
         back_populates="words",
         passive_deletes=True,           # DB가 직접 삭제하도록
     )
+
+
+class TokenActor(Base):
+    __tablename__ = "token_actors"
+    id       = Column(Integer, primary_key=True, index=True)
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("actors.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint("token_id", "actor_id", name="uq_token_actor"),
+    )
+
+    token = relationship("Token", back_populates="token_actors", passive_deletes=True)
+    actor = relationship("Actor", back_populates="token_actors", passive_deletes=True)
 
 
 
