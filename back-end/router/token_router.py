@@ -1,11 +1,12 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
 from fastapi import APIRouter, Depends, HTTPException,Path, Request
+from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
-from models import Token, Actor, TokenActor
+from models import Token, Actor, TokenActor, ActorAlias
 from schemas import Token as TokenSchema
 from schemas import TokenCreate,TokenDetail
 from .utils_s3 import load_json, presign
@@ -111,48 +112,50 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
 #     tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
 #     return tokens
 
-# 배우별 영화 조회 API - TokenActor 관계 테이블을 통해 조회
-# @router.get("/actor/{actor_name}", response_model=List[TokenSchema])
-# def read_tokens_by_actor(actor_name: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-#     """
-#     특정 배우가 출연한 Token들을 조회합니다.
-    
-#     - **actor_name**: 조회할 배우명
-#     - **skip**: 건너뛸 항목 수 (기본값: 0)
-#     - **limit**: 가져올 최대 항목 수 (기본값: 100)
-#     """
-#     # Actor 테이블에서 배우 찾기
-#     actor = db.query(Actor).filter(Actor.name.ilike(f"%{actor_name}%")).first()
-#     if not actor:
-#         return []
-    
-#     # TokenActor 관계 테이블을 통해 Token 조회
-#     tokens = db.query(Token).join(TokenActor, TokenActor.token_id == Token.id).filter(TokenActor.actor_id == actor.id).offset(skip).limit(limit).all()
-#     return tokens
 
-@router.get("/actor/{actor_name}", response_model=List[TokenSchema])
+# 배우별 영화 조회 API - TokenActor 관계 테이블을 통해 조회
+
+SIM_TH = 0.25                # 유사도 임계값 조정 가능
+
+@router.get("/actor/{query}", response_model=List[TokenSchema])
 def read_tokens_by_actor(
-        actor_name: str,
-        skip: int = 0, limit: int = 100,
-        db: Session = Depends(get_db)
+    query: str,
+    skip: int = 0, limit: int = 100,
+    db: Session = Depends(get_db)
 ):
-    q = actor_name.strip()
+    q = query.strip()
     if not q:
         return []
 
-    # ① 여러 배우 전부 찾기 (부분 + 대소문자 무시)
-    actors = (db.query(Actor)
-                .filter(Actor.name.ilike(f"%{q}%"))
-                .limit(5)
-                .all())
-    if not actors:
+    # ── 1) 별칭 테이블 1차 매치 (부분 일치, 대소문자·한영 모두)
+    alias_rows = (
+        db.query(ActorAlias.actor_id)
+          .filter(ActorAlias.name.ilike(f"%{q}%"))
+          .limit(10)
+          .all()
+    )
+    actor_ids = [row[0] for row in alias_rows]
+
+    # ── 2) 오타 보정 매치 (pg_trgm)
+    if len(actor_ids) < 10:
+        extra = (
+            db.query(ActorAlias.actor_id)
+              .filter(func.similarity(ActorAlias.name, q) > SIM_TH)
+              .order_by(desc(func.similarity(ActorAlias.name, q)))
+              .limit(10 - len(actor_ids))
+              .all()
+        )
+        actor_ids.extend(row[0] for row in extra)
+
+    if not actor_ids:
         return []
 
-    actor_ids = [a.id for a in actors]
-
-    # ② 토큰 조회
-    tokens = (db.query(Token)
-                .join(TokenActor, TokenActor.token_id == Token.id)
-                .filter(TokenActor.actor_id.in_(actor_ids))
-                .offset(skip).limit(limit).all())
+    # ── 3) 토큰 조회
+    tokens = (
+        db.query(Token)
+          .join(TokenActor, TokenActor.token_id == Token.id)
+          .filter(TokenActor.actor_id.in_(actor_ids))
+          .offset(skip).limit(limit)
+          .all()
+    )
     return tokens
