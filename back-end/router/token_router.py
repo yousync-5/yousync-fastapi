@@ -6,7 +6,7 @@ from typing import List
 
 # 데이터베이스 관련 임포트
 from database import get_db
-from models import Token, Actor
+from models import Token, Actor, TokenActor
 from schemas import Token as TokenSchema
 from schemas import TokenCreate,TokenDetail, ViewCountResponse
 from .utils_s3 import load_json, presign
@@ -110,6 +110,40 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
     return {"detail": "Token deleted successfully"}
 
 
+# 모달용 Token_id to actor_token 
+@router.get("/{token_id}/related", response_model = List[TokenSchema])
+def read_related_tokens(token_id: int, skip: int = 0, limit: int = 5, db: Session = Depends(get_db)):
+    """
+    모달용
+    Token_id 를 받아 해당 actor의 Token들을 반환한다.
+    """
+    token = db.get(Token, token_id)
+    if not token: 
+        raise HTTPException(status_code=404, detail="Token not found")
+    
+    # 기준 토큰  -> actor_id
+    actor_id = (db.query(TokenActor.actor_id).filter(TokenActor.token_id == token_id).scalar())
+
+    if actor_id is None:
+        raise HTTPException(status_code=404, detail="해당 토큰과 연결된 배우를 찾을 수 없습니다.")
+    
+
+    # 3) 같은 배우의 다른 토큰들 조회 (JOIN + 페이징 + 정렬)
+    related = (
+        db.query(Token)
+          .join(TokenActor, Token.id == TokenActor.token_id)
+          .filter(TokenActor.actor_id == actor_id,
+                  Token.id != token_id)
+          .order_by(Token.view_count.desc())
+          .offset(skip)
+          .limit(limit)
+          .all()
+    )
+    
+    return related
+
+
+# token 조회수 상승 API
 @router.post("/{token_id}/view", response_model=ViewCountResponse)
 def increment_view(token_id: int, db: Session = Depends(get_db)):
     token = db.query(Token).filter(Token.id == token_id).first()
