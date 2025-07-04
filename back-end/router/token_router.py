@@ -1,5 +1,6 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -7,7 +8,7 @@ from typing import List
 from database import get_db
 from models import Token, Actor
 from schemas import Token as TokenSchema
-from schemas import TokenCreate,TokenDetail
+from schemas import TokenCreate,TokenDetail, ViewCountResponse
 from .utils_s3 import load_json, presign
 
 # APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
@@ -38,6 +39,16 @@ def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
     tokens = db.query(Token).offset(skip).limit(limit).all()  # SQL: SELECT * FROM movies LIMIT 100 OFFSET 0
+    return tokens
+
+@router.get("/popular", response_model=List[TokenSchema])
+def read_popular_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    조회수가 높은 토큰 목록을 조회한다.
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    tokens = db.query(Token).order_by(Token.view_count.desc()).offset(skip).limit(limit).all()
     return tokens
 
 
@@ -97,6 +108,32 @@ def delete_token(token_id: int, db: Session = Depends(get_db)):
     db.delete(db_token)  # 데이터베이스에서 삭제
     db.commit()  # 변경사항 저장
     return {"detail": "Token deleted successfully"}
+
+
+@router.post("/{token_id}/view", response_model=ViewCountResponse)
+def increment_view(token_id: int, db: Session = Depends(get_db)):
+    token = db.query(Token).filter(Token.id == token_id).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Token not found")
+    
+    # DB 레벨에서 atomic 하게 view_count += 1
+    stmt = (
+        update(Token)
+        .where(Token.id == token_id)
+        .values(view_count = Token.view_count + 1)
+        .execution_options(synchronize_session="fetch")
+    )
+    try: 
+        db.execute(stmt)
+        db.commit()
+
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(500, "조회수 증가 중 오류가 발생")
+
+    token = db.get(Token, token_id)
+    return {"token_id": token.id, "view_count": token.view_count}
+
 
 # 카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
 # @router.get("/category/{category}", response_model=List[TokenSchema])

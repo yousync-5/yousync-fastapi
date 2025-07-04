@@ -23,6 +23,8 @@ class Token(Base):
         nullable=False,
         index=True,
     )
+    view_count = Column(Integer, nullable=False, default=0, index=True)   # ← 추가
+
     # 관계
     url = relationship("URL", back_populates="tokens")
     scripts = relationship("Script",
