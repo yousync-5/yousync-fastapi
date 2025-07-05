@@ -70,6 +70,7 @@ class TokenBase(BaseModel):
     s3_pitch_url: Optional[str] = None
     s3_bgvoice_url: Optional[str] = None
     youtube_url: Optional[str] = None
+    view_count: int = Field(0, description="누적 조회수")
 
 class TokenCreate(TokenBase):
     pass
@@ -90,6 +91,12 @@ class TokenDetail(TokenBase):
     class Config:
         from_attributes = True   
 
+class ViewCountResponse(BaseModel):
+    token_id: int
+    view_count: int
+
+    class Config:
+        from_attributes = True   
 
 
 # === User Schemas ===
