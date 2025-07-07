@@ -35,6 +35,22 @@ class ScriptWord(ScriptWordBase):
  
 
 
+# 분석용 데이터
+class ScriptWordUser(BaseModel):
+    id: int
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    word: Optional[str] = None
+    # JSON 컬럼의 2D 리스트를 받기 위한 필드
+    mfcc: Optional[List[List[float]]] = Field(
+        None,
+        description="Frame-by-frame 13-dim MFCC vectors"
+    )
+
+    class Config: 
+        from_attributes = True
+
+
 
 # === Script Schemas ===
 class ScriptBase(BaseModel):
@@ -49,6 +65,7 @@ class ScriptCreate(ScriptBase):
     pass
 
 
+
 class Script(ScriptBase):
     id: int
     # actor: Optional[Actor] = None  # 배우 정보 포함
@@ -56,6 +73,16 @@ class Script(ScriptBase):
     
     class Config:
         from_attributes = True
+
+
+# 분석용 데이터 Script
+class ScriptUser(BaseModel):
+    id: int 
+    words: List[ScriptWordUser] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
 
 
 

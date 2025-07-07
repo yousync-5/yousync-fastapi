@@ -49,7 +49,6 @@ class Token(Base):
     
     analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
 
-    
 
 class URL(Base):
     __tablename__ = "urls"
@@ -68,7 +67,8 @@ class URL(Base):
 
 class Actor(Base):
     __tablename__ = "actors"
-    
+
+    # autoicrement = True 설정해야하나???
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     
@@ -153,6 +153,7 @@ class ScriptWord(Base):
     start_time = Column(Float)
     end_time = Column(Float)
     probability = Column(Float)
+    mfcc        = Column(JSON, nullable=True)   # ★ 추가
 
     # 관계 설정
     script = relationship(
