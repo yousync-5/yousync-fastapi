@@ -17,7 +17,6 @@ class Actor(ActorBase):
         from_attributes = True
 
 
-
 # === ScriptWord ===
 class ScriptWordBase(BaseModel):
     script_id: int # script_id를 기반으로 연결
@@ -32,7 +31,6 @@ class ScriptWord(ScriptWordBase):
 
     class Config:
         from_attributes = True
- 
 
 
 # 분석용 데이터
@@ -51,7 +49,6 @@ class ScriptWordUser(BaseModel):
         from_attributes = True
 
 
-
 # === Script Schemas ===
 class ScriptBase(BaseModel):
     token_id: int  #  변경: token_id를 기반으로 연결
@@ -63,7 +60,6 @@ class ScriptBase(BaseModel):
 
 class ScriptCreate(ScriptBase):
     pass
-
 
 
 class Script(ScriptBase):
@@ -82,7 +78,6 @@ class ScriptUser(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 
 

@@ -83,9 +83,18 @@ async def send_analysis_async(s3_url: str, script_obj: ScriptUser,
         "webhook_url":  webhook_url,
         "script":       script_obj.dict()   # Pydantic → dict
     }
+    # JSON 문자열로 직렬화
+    form_data = {
+        "request_data": json.dumps(payload, ensure_ascii=False)
+    }
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(TARGET_URL, json=payload)
+            resp = await client.post(
+                url=TARGET_URL,
+                data=form_data,  # ★ json=X, data=O
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
             resp.raise_for_status()
             logging.info(f"[분석 요청 성공] job_id={job_id}")
     except httpx.HTTPError as e:
