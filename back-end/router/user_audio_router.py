@@ -73,7 +73,7 @@ async def upload_to_s3_async(s3_client, file_data: bytes, filename: str) -> str:
 async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: str, job_id: str, token_info: Token):
     """httpx를 사용한 완전 비동기 분석 요청"""
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=70.0) as client:
             response = await client.post(
                 TARGET_URL,
                 data={
@@ -87,10 +87,22 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
             )
             response.raise_for_status()
             logging.info(f"[분석 요청 성공] job_id={job_id}")
+            
+            # 응답 데이터 확인 및 반환
+            if response.text and response.text.strip():
+                try:
+                    response_data = response.json()
+                    logging.info(f"[분석 서버 응답] {len(str(response_data))} 문자")
+                    return response_data
+                except:
+                    logging.info(f"[분석 서버 텍스트 응답] {response.text}")
+                    
     except httpx.HTTPStatusError as e:
         logging.error(f"[분석 요청 실패] job_id={job_id}, status={e.response.status_code}, body={e.response.text}")
+        raise
     except Exception as e:
         logging.error(f"[분석 요청 실패] job_id={job_id}, error={e}")
+        raise
 
 # 1. 오디오 업로드 및 분석 요청 (완전 비동기 처리)
 @router.post("/{token_id}/upload-audio")
@@ -128,7 +140,7 @@ async def upload_audio_by_token_id(
                 
                 # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
-                await send_analysis_request_async(
+                response_data = await send_analysis_request_async(
                     s3_url, 
                     token_info.id, 
                     webhook_url, 
@@ -136,7 +148,19 @@ async def upload_audio_by_token_id(
                     token_info
                 )
                 
-                update_analysis_result(bg_db, job_id, progress=90, message="분석 중... 결과 대기")
+                # POST 응답에서 실제 분석 결과가 있는지 확인
+                if response_data and isinstance(response_data, dict) and 'scores' in response_data:
+                    # 실제 분석 결과를 받은 경우
+                    update_analysis_result(bg_db, job_id, 
+                                          status="completed", 
+                                          progress=100, 
+                                          result=response_data, 
+                                          message="분석 완료")
+                    logging.info(f"[POST 응답으로 분석 완료] job_id={job_id}")
+                else:
+                    # 웹훅 대기 상태로 설정
+                    update_analysis_result(bg_db, job_id, progress=90, message="분석 중... 결과 대기")
+                    logging.info(f"[웹훅 대기] job_id={job_id}")
                 
             except Exception as e:
                 logging.error(f"백그라운드 처리 실패: {str(e)}")
@@ -167,8 +191,16 @@ async def upload_audio_by_token_id(
 async def receive_analysis(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import JSONResponse
     
+    # 웹훅 호출 로깅 추가
+    logging.info("=" * 50)
+    logging.info("[🔔 웹훅 호출됨] Token 분석 결과 웹훅 수신")
+    logging.info(f"[웹훅 요청 IP] {request.client.host if request.client else 'Unknown'}")
+    logging.info(f"[웹훅 헤더] {dict(request.headers)}")
+    
     job_id = request.query_params.get("job_id")
     task_id = request.query_params.get("task_id")
+    
+    logging.info(f"[웹훅 파라미터] job_id={job_id}, task_id={task_id}")
 
     if not job_id:
         logging.warning("[❗경고] job_id 없이 webhook 도착. 무시됨")
@@ -181,7 +213,14 @@ async def receive_analysis(request: Request, db: Session = Depends(get_db)):
         return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
 
     data = await request.json()
-    results = data.get("analysis_results", {})
+    # analysis_results 키가 있으면 그것을, 없으면 전체 데이터를 사용
+    if "analysis_results" in data:
+        results = data.get("analysis_results", {})
+    else:
+        results = data  # 전체 데이터를 결과로 사용
+    
+    logging.info(f"[웹훅 데이터] 받은 결과 크기: {len(str(results))} 문자")
+    logging.info(f"[웹훅 데이터] 결과 키들: {list(results.keys()) if isinstance(results, dict) else 'Not dict'}")
     
     # 분석 완료 상태로 업데이트
     update_analysis_result(db, job_id, 
@@ -190,7 +229,8 @@ async def receive_analysis(request: Request, db: Session = Depends(get_db)):
                           result=results, 
                           message="분석 완료")
 
-    logging.info(f"[분석 결과 수신] job_id={job_id}, task_id={task_id}, result={results}")
+    logging.info(f"[✅ 웹훅 처리 완료] job_id={job_id}, task_id={task_id}")
+    logging.info("=" * 50)
     return {"received": True, "job_id": job_id, "task_id": task_id}
 
 

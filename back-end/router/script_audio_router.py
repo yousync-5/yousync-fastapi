@@ -99,6 +99,7 @@ async def send_analysis_async(s3_url: str, script_obj: ScriptUser,
             logging.info(f"[분석 요청 성공] job_id={job_id}")
     except httpx.HTTPError as e:
         logging.error(f"[분석 요청 실패] job_id={job_id} - {e}")
+        raise
 
 
 # ────────────── Router ──────────────
@@ -139,7 +140,9 @@ async def upload_script_audio(
             cb    = f"{WEBHOOK_URL}?job_id={job_id}"
             await send_analysis_async(s3url, script_obj, cb, job_id)
 
+            # 웹훅 대기 상태로 설정
             update_script_result(bg_db, job_id, progress=90, message="분석 중…")
+                
         except Exception as e:
             logging.error(e)
             update_script_result(bg_db, job_id, status="failed",
@@ -154,12 +157,28 @@ async def upload_script_audio(
 # 2) 분석 서버 웹훅
 @router.post("/webhook/analysis-complete")
 async def analysis_webhook(request: Request, db: Session = Depends(get_db)):
+    # 웹훅 호출 로깅 추가
+    logging.info("=" * 50)
+    logging.info("[🔔 웹훅 호출됨] Scripts 분석 결과 웹훅 수신")
+    logging.info(f"[웹훅 요청 IP] {request.client.host if request.client else 'Unknown'}")
+    logging.info(f"[웹훅 헤더] {dict(request.headers)}")
+    
     job_id = request.query_params.get("job_id")
+    logging.info(f"[웹훅 파라미터] job_id={job_id}")
+    
     if not job_id:
+        logging.warning("[❗경고] Scripts 웹훅에 job_id 없음")
         raise HTTPException(400, "job_id missing")
+        
     payload = await request.json()
+    logging.info(f"[웹훅 데이터] 받은 결과 크기: {len(str(payload))} 문자")
+    logging.info(f"[웹훅 데이터] 결과 키들: {list(payload.keys()) if isinstance(payload, dict) else 'Not dict'}")
+    
     update_script_result(db, job_id, status="completed",
                          progress=100, result=payload, message="분석 완료")
+    
+    logging.info(f"[✅ 웹훅 처리 완료] job_id={job_id}")
+    logging.info("=" * 50)
     return {"received": True, "job_id": job_id}
 
 # 3) 결과 조회
