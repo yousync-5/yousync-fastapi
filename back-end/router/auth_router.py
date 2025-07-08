@@ -264,8 +264,10 @@ async def get_current_user_info(
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
+        google_id=current_user.google_id,
         full_name=current_user.full_name,
         profile_picture=current_user.profile_picture,
+        is_active=current_user.is_active,
         login_type=current_user.login_type,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at

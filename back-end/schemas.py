@@ -130,8 +130,10 @@ class UserResponse(BaseModel):
     """사용자 정보 응답 스키마 (비밀번호 제외)"""
     id: int
     email: str
+    google_id: Optional[str] = None
     full_name: Optional[str] = None
     profile_picture: Optional[str] = None
+    is_active: bool = True
     login_type: str = "email"
     created_at: datetime
     updated_at: Optional[datetime] = None
