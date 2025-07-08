@@ -43,17 +43,7 @@ def update_analysis_result(db: Session, job_id: str, **kwargs):
 def get_analysis_result(db: Session, job_id: str):
     return db.query(AnalysisResult).filter(AnalysisResult.job_id == job_id).first()
 
-# # boto3로 업로드 함수 구현, 추후 분리 가능 boto3를 import
-# s3 = boto3.client(
-#     "s3",
-#     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-#     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-#     region_name=os.getenv("AWS_REGION")
-# )
 
-
-
-S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
 # ===============================================
 
@@ -62,8 +52,9 @@ router = APIRouter(
     tags=["tokens"]
 )
 
-TARGET_URL = os.getenv("TARGET_SERVER_URL", "http://54.180.25.231:8000/analyze-voice")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://yousync-fastapi-production.up.railway.app//tokens/webhook/analysis-complete")
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
+TARGET_URL = os.getenv("TARGET_SERVER_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 # 비동기 S3 업로드 함수
 async def upload_to_s3_async(s3_client, file_data: bytes, filename: str) -> str:

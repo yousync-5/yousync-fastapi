@@ -14,8 +14,8 @@ from schemas import ScriptUser, ScriptWordUser      # ★ Pydantic 스키마
 
 # ──────────────────────────────────────────────────
 S3_BUCKET   = os.getenv("S3_BUCKET_NAME")
-TARGET_URL  = os.getenv("TARGET_SERVER_URL", "http://54.180.25.231:8000/analyze-script")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL",      "http://3.34.190.149/scripts/webhook/analysis-complete")
+TARGET_URL  = os.getenv("SCRIPT_TARGET_SERVER_URL")
+WEBHOOK_URL = os.getenv("SCRIPT_WEBHOOK_URL")
 
 # ────────────── DB 헬퍼 ──────────────
 def create_script_result(db: Session, job_id: str, token_id: int):
