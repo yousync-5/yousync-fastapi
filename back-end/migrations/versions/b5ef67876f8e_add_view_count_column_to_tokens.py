@@ -19,13 +19,14 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    op.add_column(
-        'tokens',
-        sa.Column('view_count',
-                  sa.Integer(),
-                  nullable=False,
-                  server_default='0')
-    )
+    pass
+    # op.add_column(
+    #     'tokens',
+    #     sa.Column('view_count',
+    #               sa.Integer(),
+    #               nullable=False,
+    #               server_default='0')
+    # )
     # 기존 데이터가 null 문제가 없도록 server_default='0' 설정
 
 def downgrade():
