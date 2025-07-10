@@ -121,6 +121,19 @@ class ViewCountResponse(BaseModel):
         from_attributes = True   
 
 
+
+# === Url Schemas ===
+class UrlCheckRequest(BaseModel):
+    youtube_url: str
+
+class UrlExistsResponse(BaseModel):
+    exists: bool
+
+    class Config:
+        orm_mode = True
+
+
+
 # === User Schemas ===
 class GoogleLoginRequest(BaseModel):
     id_token: str
