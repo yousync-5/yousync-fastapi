@@ -9,6 +9,7 @@ import httpx
 from database import get_db
 from sqlalchemy.orm import Session
 from models import Token, AnalysisResult, User
+from services.sqs_service import sqs_service
 
 
 async def get_token_by_id(token_id: str, db:Session):
@@ -69,7 +70,36 @@ async def upload_to_s3_async(s3_client, file_data: bytes, filename: str) -> str:
     with ThreadPoolExecutor() as executor:
         return await loop.run_in_executor(executor, sync_upload)
 
-# 비동기 HTTP 요청 함수
+# SQS 메시지 전송 함수
+async def send_to_sqs_async(s3_url: str, token_id: str, webhook_url: str, job_id: str, token_info: Token):
+    """SQS를 사용한 분석 요청"""
+    try:
+        # 토큰 정보를 딕셔너리로 변환
+        token_info_dict = {
+            's3_textgrid_url': getattr(token_info, 's3_textgrid_url', None),
+            's3_pitch_url': getattr(token_info, 's3_pitch_url', None)
+        }
+        
+        # SQS에 메시지 전송
+        message_id = sqs_service.send_analysis_message(
+            job_id=job_id,
+            s3_audio_url=s3_url,
+            token_id=str(token_id),
+            webhook_url=webhook_url,
+            token_info=token_info_dict
+        )
+        
+        if message_id:
+            logging.info(f"[SQS 전송 성공] job_id={job_id}, message_id={message_id}")
+            return {"message_id": message_id, "status": "queued"}
+        else:
+            raise Exception("SQS 메시지 전송 실패")
+            
+    except Exception as e:
+        logging.error(f"[SQS 전송 실패] job_id={job_id}, error={str(e)}")
+        raise
+
+# 비동기 HTTP 요청 함수 (기존 방식 - 하위 호환용)
 async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: str, job_id: str, token_info: Token):
     """httpx를 사용한 완전 비동기 분석 요청"""
     try:
@@ -136,28 +166,59 @@ async def upload_audio_by_token_id(
                 s3_key = await upload_to_s3_async(s3_client_bg, file_data, file.filename)
                 s3_url = f"s3://{S3_BUCKET}/{s3_key}"
                 
-                update_analysis_result(bg_db, job_id, progress=70, message="분석 서버 요청 중...")
-                
-                # 비동기 분석 요청
                 webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
-                response_data = await send_analysis_request_async(
-                    s3_url, 
-                    token_info.id, 
-                    webhook_url, 
-                    job_id,
-                    token_info
-                )
                 
-                # POST 응답에서 실제 분석 결과가 있는지 확인
-                if response_data and isinstance(response_data, dict) and 'scores' in response_data:
-                    # 실제 분석 결과를 받은 경우
-                    update_analysis_result(bg_db, job_id, 
-                                          status="completed", 
-                                          progress=100, 
-                                          result=response_data, 
-                                          message="분석 완료")
-                    logging.info(f"[POST 응답으로 분석 완료] job_id={job_id}")
+                # 환경 변수로 SQS 사용 여부 결정
+                use_sqs = os.getenv('USE_SQS_QUEUE', 'false').lower() == 'true'
+                
+                if use_sqs:
+                    # SQS 방식
+                    update_analysis_result(bg_db, job_id, progress=70, message="SQS 큐에 메시지 전송 중...")
+                    
+                    sqs_result = await send_to_sqs_async(
+                        s3_url, 
+                        token_info.id, 
+                        webhook_url, 
+                        job_id,
+                        token_info
+                    )
+                    
+                    update_analysis_result(
+                        bg_db, job_id, 
+                        status="queued_for_analysis", 
+                        progress=90, 
+                        message="SQS 큐에 전송 완료, 분석 대기 중...",
+                        metadata={"sqs_message_id": sqs_result.get("message_id")}
+                    )
+                    logging.info(f"[SQS 방식 완료] job_id={job_id}")
+                    
                 else:
+                    # 기존 HTTP 방식
+                    update_analysis_result(bg_db, job_id, progress=70, message="분석 서버 요청 중...")
+                    
+                    response_data = await send_analysis_request_async(
+                        s3_url, 
+                        token_info.id, 
+                        webhook_url, 
+                        job_id,
+                        token_info
+                    )
+                    
+                    # POST 응답에서 실제 분석 결과가 있는지 확인
+                    if response_data and isinstance(response_data, dict) and 'scores' in response_data:
+                        # 실제 분석 결과를 받은 경우
+                        update_analysis_result(bg_db, job_id, 
+                                              status="completed", 
+                                              progress=100, 
+                                              result=response_data, 
+                                              message="분석 완료")
+                        logging.info(f"[HTTP POST 응답으로 분석 완료] job_id={job_id}")
+                    else:
+                        # 웹훅 대기 상태로 설정
+                        update_analysis_result(bg_db, job_id, progress=90, message="분석 중... 결과 대기")
+                        logging.info(f"[HTTP 웹훅 대기] job_id={job_id}")
+                
+            except Exception as e:
                     # 웹훅 대기 상태로 설정
                     update_analysis_result(bg_db, job_id, progress=90, message="분석 중... 결과 대기")
                     logging.info(f"[웹훅 대기] job_id={job_id}")
@@ -308,3 +369,33 @@ async def stream_analysis_progress(job_id: str):
             "Access-Control-Allow-Origin": "*"
         }
     )
+
+# SQS 큐 상태 조회 API
+@router.get("/queue/status")
+def get_sqs_queue_status():
+    """SQS 큐 상태 조회"""
+    try:
+        queue_attributes = sqs_service.get_queue_attributes()
+        
+        if queue_attributes:
+            return {
+                "status": "success",
+                "queue_info": {
+                    "messages_available": queue_attributes.get('ApproximateNumberOfMessages', '0'),
+                    "messages_in_flight": queue_attributes.get('ApproximateNumberOfMessagesNotVisible', '0'),
+                    "queue_url": os.getenv('SQS_QUEUE_URL', 'Not configured')
+                },
+                "sqs_enabled": os.getenv('USE_SQS_QUEUE', 'false').lower() == 'true'
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "SQS 큐 정보를 가져올 수 없습니다.",
+                "sqs_enabled": os.getenv('USE_SQS_QUEUE', 'false').lower() == 'true'
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"SQS 상태 조회 실패: {str(e)}",
+            "sqs_enabled": os.getenv('USE_SQS_QUEUE', 'false').lower() == 'true'
+        }
