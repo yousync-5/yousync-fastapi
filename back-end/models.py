@@ -30,7 +30,9 @@ class Token(Base):
     scripts = relationship("Script",
                         back_populates="token",
                         cascade="all, delete",
-                        passive_deletes=True)          # ✅   
+                        passive_deletes=True,
+                        order_by="Script.id"
+                        )           
 
 
     token_actors = relationship(
@@ -135,7 +137,8 @@ class Script(Base):
         "ScriptWord",
         back_populates="script",
         cascade="all, delete",
-        passive_deletes=True,            # ➕
+        passive_deletes=True,
+        order_by="ScriptWord.id"
     )
 
 

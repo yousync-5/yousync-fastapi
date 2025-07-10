@@ -207,7 +207,7 @@ async def stream_progress(job_id: str):
             try:
                 r = get_script_result(db, job_id)
                 if not r:
-                    yield "data: {\"error\":\"Job not found\"}\\n\\n"
+                    yield "data: {\"error\":\"Job not found\"}\n\n"
                     break
                 data = {
                     "job_id":   r.job_id,
@@ -216,7 +216,7 @@ async def stream_progress(job_id: str):
                     "message":  r.message,
                     "result":   r.result,
                 }
-                yield f"data: {json.dumps(data, ensure_ascii=False)}\\n\\n"
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 if r.status in ("completed", "failed"): break
             finally:
                 db.close()
