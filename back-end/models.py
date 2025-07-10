@@ -211,6 +211,13 @@ class User(Base):
         passive_deletes=True,
     )
 
+    analysis_results = relationship(
+        "AnalysisResult",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
     token_scores = relationship(
         "UserTokenScore",
         back_populates="user",
