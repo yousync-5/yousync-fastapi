@@ -48,6 +48,53 @@ def read_actors(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return actors
 
 
+
+@router.get("/search/{query}", response_model=List[ActorSchema])
+def search_actors(
+    query: str,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    """
+    배우 이름 유사 검색 (한글/영어 모두 지원)
+    """
+    q = query.strip()
+    if not q:
+        return []
+
+    # 1) 부분 일치(alias.name ilike)
+    alias_q = (
+        db.query(ActorAlias.actor_id)
+          .filter(ActorAlias.name.ilike(f"%{q}%"))
+          .limit(limit)
+          .subquery()
+    )
+    actor_ids = [row[0] for row in db.query(alias_q).all()]
+
+    # 2) 트라이그램 유사도 보정 (similarity > SIM_TH)
+    if len(actor_ids) < limit:
+        extra = (
+            db.query(ActorAlias.actor_id)
+              .filter(func.similarity(ActorAlias.name, q) > SIM_TH)
+              .order_by(desc(func.similarity(ActorAlias.name, q)))
+              .limit(limit - len(actor_ids))
+              .all()
+        )
+        actor_ids.extend(r[0] for r in extra)
+
+    if not actor_ids:
+        return []
+
+    # 3) Actor 테이블에서 id, name 조회
+    actors = (
+        db.query(Actor)
+          .filter(Actor.id.in_(actor_ids))
+          .all()
+    )
+    return actors
+
+
+
 # 배우별 영화 조회 API - TokenActor 관계 테이블을 통해 조회
 SIM_TH = 0.25                # 유사도 임계값 조정 가능
 
@@ -98,45 +145,3 @@ def read_tokens_by_actor(
     return tokens
 
 
-
-# # 배우 수정 API
-# @router.put("/{actor_id}", response_model=ActorSchema)
-# def update_actor(actor_id: int, actor: ActorCreate, db: Session = Depends(get_db)):
-#     """
-#     기존 배우 정보를 수정합니다.
-    
-#     - **actor_id**: 수정할 배우의 ID
-#     - **name**: 수정할 배우 이름
-#     """
-#     db_actor = db.query(Actor).filter(Actor.id == actor_id).first()
-#     if db_actor is None:
-#         raise HTTPException(status_code=404, detail="Actor not found")
-    
-#     # 이름 중복 체크 (자기 자신 제외)
-#     if actor.name != db_actor.name:
-#         existing_actor = db.query(Actor).filter(Actor.name == actor.name).first()
-#         if existing_actor:
-#             raise HTTPException(status_code=400, detail="Actor name already exists")
-    
-#     for field, value in actor.dict().items():
-#         setattr(db_actor, field, value)
-    
-#     db.commit()
-#     db.refresh(db_actor)
-#     return db_actor
-
-# # 배우 삭제 API
-# @router.delete("/{actor_id}")
-# def delete_actor(actor_id: int, db: Session = Depends(get_db)):
-#     """
-#     특정 ID의 배우를 삭제합니다.
-    
-#     - **actor_id**: 삭제할 배우의 ID
-#     """
-#     db_actor = db.query(Actor).filter(Actor.id == actor_id).first()
-#     if db_actor is None:
-#         raise HTTPException(status_code=404, detail="Actor not found")
-    
-#     db.delete(db_actor)
-#     db.commit()
-#     return {"detail": "Actor deleted successfully"}
