@@ -178,3 +178,24 @@ class BookmarkListOut(BaseModel):
     class Config:
         from_attributes = True
         
+
+# === AnalysisResult Schemas ===
+class TokenScore(BaseModel):
+    token_id: int 
+    average_score: float
+
+
+
+class UserScore(BaseModel):
+    user_id: int 
+    average_score: float
+
+
+class UserToken(BaseModel):
+    user_id: int
+    tokens: List[Token]
+
+    class Config:
+        from_attributes = True
+
+

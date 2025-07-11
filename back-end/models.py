@@ -279,22 +279,21 @@ class Bookmark(Base):
 
 
 # 점수 조회용 모델
+# class UserTokenScore(Base):
+#     __tablename__ = "user_token_scores"
 
-class UserTokenScore(Base):
-    __tablename__ = "user_token_scores"
-
-    id       = Column(Integer, primary_key=True, index=True)
-    user_id  = Column(Integer, ForeignKey("users.id",   ondelete="CASCADE"), nullable=False, index=True)
-    token_id = Column(Integer, ForeignKey("tokens.id",  ondelete="CASCADE"), nullable=False, index=True)
-    total_score    = Column(Float, nullable=False)
-    score_count  = Column(Integer, nullable=False, default=0)     # 점수 개수
-    avg_score    = Column(Float,   nullable=False, default=0.0)   # 평균 점수
+#     id       = Column(Integer, primary_key=True, index=True)
+#     user_id  = Column(Integer, ForeignKey("users.id",   ondelete="CASCADE"), nullable=False, index=True)
+#     token_id = Column(Integer, ForeignKey("tokens.id",  ondelete="CASCADE"), nullable=False, index=True)
+#     total_score    = Column(Float, nullable=False)
+#     score_count  = Column(Integer, nullable=False, default=0)     # 점수 개수
+#     avg_score    = Column(Float,   nullable=False, default=0.0)   # 평균 점수
     
-    updated_at = Column(
-        DateTime, 
-        server_default=func.now(),
-        onupdate=func.now()
-    )
+#     updated_at = Column(
+#         DateTime, 
+#         server_default=func.now(),
+#         onupdate=func.now()
+#     )
 
-    user  = relationship("User", back_populates="token_scores")
-    token = relationship("Token", back_populates="user_scores")
+#     user  = relationship("User", back_populates="token_scores")
+#     token = relationship("Token", back_populates="user_scores")

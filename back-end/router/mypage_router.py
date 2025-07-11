@@ -113,3 +113,33 @@ def get_mypage_overview(
     한 번에 반환하는 엔드포인트로 확장하세요.
     """
     return {"msg": "준비 중입니다."}
+
+
+@router.delete(
+    "/tokens/{token_id}/results",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="내가 더빙했던 해당 토큰의 모든 분석 결과 삭제"
+)
+def delete_my_token_results(
+    token_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    1) 현재 로그인된 유저가 남긴 AnalysisResult 중
+       token_id가 일치하는 것들을 모두 삭제합니다.
+    2) 삭제된 행이 없으면 404 에러를 반환합니다.
+    """
+    delete_q = (
+        db.query(AnalysisResult)
+          .filter(AnalysisResult.user_id == current_user.id)
+          .filter(AnalysisResult.token_id == token_id)
+    )
+    deleted_count = delete_q.delete(synchronize_session=False)
+    if deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="삭제할 분석 결과가 없습니다."
+        )
+    db.commit()
+    # 204 No Content이므로 반환 바디는 없습니다.
