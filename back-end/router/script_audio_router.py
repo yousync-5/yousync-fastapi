@@ -18,11 +18,12 @@ TARGET_URL  = os.getenv("SCRIPT_TARGET_SERVER_URL")
 WEBHOOK_URL = os.getenv("SCRIPT_WEBHOOK_URL")
 
 # ────────────── DB 헬퍼 ──────────────
-def create_script_result(db: Session, job_id: str, token_id: int):
+def create_script_result(db: Session, job_id: str, token_id: int , user_id: int = None):
 
     ar = AnalysisResult(
         job_id=job_id, 
         token_id=token_id,
+        user_id=user_id,
         # script_id=script_id,
         status="processing", 
         progress=10, 

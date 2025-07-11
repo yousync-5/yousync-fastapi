@@ -196,7 +196,8 @@ class User(Base):
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+    # 관계 설정    
+    analysis_results = relationship("AnalysisResult",back_populates="user")
     bookmarks = relationship(
         "Bookmark",
         back_populates="user",
@@ -213,6 +214,9 @@ class AnalysisResult(Base):
     __tablename__ = "analysis_results"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True) ##로직 완성되면 nullable=False로 수정
+
     job_id = Column(String, unique=True, index=True)
     token_id = Column(Integer,
                   ForeignKey("tokens.id", ondelete="CASCADE"),
@@ -224,6 +228,8 @@ class AnalysisResult(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     token = relationship("Token", back_populates="analysis_results") #??
+    user = relationship("User",back_populates="analysis_results")
+    
 
 
 
