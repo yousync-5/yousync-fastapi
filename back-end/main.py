@@ -34,6 +34,7 @@ from router.actor_router import router as actor_router
 from router.mypage_router import router as mypage_router
 from router.script_audio_router import router as script_audio_router
 from router.url_router import router as url_router
+from router.score_router import router as score_router
 
 # 데이터베이스 테이블 생성 (앱 시작시 자동으로 테이블이 생성됨)
 Base.metadata.create_all(bind=engine)
@@ -89,6 +90,7 @@ app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로�
 app.include_router(mypage_router) # /mapage 결로로 스크립트 관련 API 등록
 app.include_router(script_audio_router)
 app.include_router(url_router) # url 관련 라우터
+app.include_router(score_router) # /score 경로로 점수 관련 API 등록
 
 # 루트 엔드포인트 - API 서버 상태 확인용
 @app.get("/")

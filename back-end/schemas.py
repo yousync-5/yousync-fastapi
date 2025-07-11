@@ -177,4 +177,48 @@ class BookmarkListOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# === My Dubbed Tokens Schemas ===
+class MyDubbedTokenResponse(BaseModel):
+    token_id: int
+    token_name: str
+    actor_name: str
+    category: Optional[str] = None
+    last_dubbed_at: datetime
+    total_scripts: int
+    completed_scripts: int
+    
+    class Config:
+        from_attributes = True
+
+
+class TokenAnalysisStatusResponse(BaseModel):
+    token_id: int
+    has_analysis: bool
+    script_results: List[dict] = Field(default_factory=list)
+    
+    class Config:
+        from_attributes = True
         
+
+# === AnalysisResult Schemas ===
+class TokenScore(BaseModel):
+    token_id: int 
+    average_score: float
+
+
+
+class UserScore(BaseModel):
+    user_id: int 
+    average_score: float
+
+
+class UserToken(BaseModel):
+    user_id: int
+    tokens: List[Token]
+
+    class Config:
+        from_attributes = True
+
+

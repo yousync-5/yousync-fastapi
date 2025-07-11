@@ -48,6 +48,13 @@ class Token(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    user_scores = relationship(
+        "UserTokenScore",
+        back_populates="token",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     
     analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
 
@@ -204,6 +211,20 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    analysis_results = relationship(
+        "AnalysisResult",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
+    token_scores = relationship(
+        "UserTokenScore",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     
 # 사용자 선호도 조사
 # 사용자 id - AnlysisResult
@@ -219,8 +240,13 @@ class AnalysisResult(Base):
 
     job_id = Column(String, unique=True, index=True)
     token_id = Column(Integer,
-                  ForeignKey("tokens.id", ondelete="CASCADE"),
+                ForeignKey("tokens.id", ondelete="CASCADE"),
                   nullable=False)
+    user_id  = Column(Integer, 
+                ForeignKey("users.id", ondelete="CASCADE"), 
+                nullable=True, 
+                index=True)
+
     status = Column(String, nullable=False)
     progress = Column(Integer, nullable=False)
     result = Column(JSON, nullable=True)  # analysis_results 점수만 저장
@@ -256,3 +282,24 @@ class Bookmark(Base):
     # 양방향 편의를 위한 관계
     user  = relationship("User",  back_populates="bookmarks", passive_deletes=True)
     token = relationship("Token", back_populates="bookmarked_by", passive_deletes=True)
+
+
+# 점수 조회용 모델
+# class UserTokenScore(Base):
+#     __tablename__ = "user_token_scores"
+
+#     id       = Column(Integer, primary_key=True, index=True)
+#     user_id  = Column(Integer, ForeignKey("users.id",   ondelete="CASCADE"), nullable=False, index=True)
+#     token_id = Column(Integer, ForeignKey("tokens.id",  ondelete="CASCADE"), nullable=False, index=True)
+#     total_score    = Column(Float, nullable=False)
+#     score_count  = Column(Integer, nullable=False, default=0)     # 점수 개수
+#     avg_score    = Column(Float,   nullable=False, default=0.0)   # 평균 점수
+    
+#     updated_at = Column(
+#         DateTime, 
+#         server_default=func.now(),
+#         onupdate=func.now()
+#     )
+
+#     user  = relationship("User", back_populates="token_scores")
+#     token = relationship("Token", back_populates="user_scores")
