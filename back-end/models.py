@@ -48,13 +48,6 @@ class Token(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-
-    user_scores = relationship(
-        "UserTokenScore",
-        back_populates="token",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
     
     analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
 
@@ -218,13 +211,6 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
-
-    token_scores = relationship(
-        "UserTokenScore",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
     
 # 사용자 선호도 조사
 # 사용자 id - AnlysisResult
@@ -236,7 +222,7 @@ class AnalysisResult(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True) ##로직 완성되면 nullable=False로 수정
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False) ##로직 완성되면 nullable=False로 수정
 
     job_id = Column(String, unique=True, index=True)
     token_id = Column(Integer,

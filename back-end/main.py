@@ -10,10 +10,7 @@ PostgreSQL 데이터베이스를 사용하여 데이터를 저장하고 관리�
 - 장르별/감독별 영화 검색
 - API 문서 자동 생성 (Swagger UI)
 
-API 문서 접근:
-- Swagger UI: https://yousync-fastapi-production.up.railway.app/docs
-- ReDoc: https://yousync-fastapi-production.up.railway.app/redoc
-"""
+
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
