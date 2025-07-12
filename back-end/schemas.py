@@ -91,6 +91,7 @@ class TokenBase(BaseModel):
     s3_textgrid_url: Optional[str] = None
     s3_pitch_url: Optional[str] = None
     s3_bgvoice_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     youtube_url: Optional[str] = None
     view_count: int = Field(0, description="누적 조회수")
 
@@ -171,9 +172,23 @@ class BookmarkOut(BaseModel):
     class Config:
         from_attributes = True
 
+# 토큰 정보를 포함한 북마크 정보 (프론트엔드 요구사항)
+class TokenInfo(BaseModel):
+    id: int
+    token_name: str
+    actor_name: str
+    category: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 class BookmarkListOut(BaseModel):
     id: int
-    token: Token
+    user_id: int
+    token_id: int
+    created_at: datetime
+    token: TokenInfo
 
     class Config:
         from_attributes = True
@@ -218,6 +233,20 @@ class UserToken(BaseModel):
     user_id: int
     tokens: List[Token]
 
+    class Config:
+        from_attributes = True
+
+
+# === MyPage Overview Schemas ===
+class MyPageOverviewResponse(BaseModel):
+    user_info: UserResponse
+    total_bookmarks: int
+    total_dubbed_tokens: int
+    total_practice_count: int
+    average_completion_rate: float
+    recent_bookmarks: List[BookmarkListOut] = Field(default_factory=list)
+    recent_dubbed_tokens: List[MyDubbedTokenResponse] = Field(default_factory=list)
+    
     class Config:
         from_attributes = True
 
