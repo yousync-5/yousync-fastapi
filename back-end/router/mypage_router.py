@@ -124,7 +124,7 @@ def list_bookmarks(
 
 
 @router.get(
-    "/my-dubbed-tokens",
+    "/my-dubbed-tokens/",
     response_model=List[MyDubbedTokenResponse],
     summary="내가 더빙한 토큰 목록 조회"
 )
@@ -176,7 +176,7 @@ def get_my_dubbed_tokens(
 
 
 @router.get(
-    "/tokens/{token_id}/analysis-status",
+    "/tokens/{token_id}/analysis-status/",
     response_model=TokenAnalysisStatusResponse,
     summary="특정 토큰의 내 분석 상태 확인"
 )
@@ -236,7 +236,7 @@ def get_token_analysis_status(
 
 
 @router.delete(
-    "/tokens/{token_id}/my-results",
+    "/tokens/{token_id}/my-results/",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="재더빙을 위한 기존 분석 결과 삭제"
 )
@@ -270,7 +270,7 @@ def delete_my_token_results(
 
 # --- 마이페이지 통합 정보 API (새로 구현) -------------
 @router.get(
-    "/overview",
+    "/overview/",
     response_model=MyPageOverviewResponse,
     summary="마이페이지 통합 정보 조회"
 )

@@ -135,7 +135,7 @@ async def send_analysis_request_async(s3_url: str, token_id: str, webhook_url: s
         raise
 
 # 1. 오디오 업로드 및 분석 요청 (완전 비동기 처리)
-@router.post("/{token_id}/upload-audio")
+@router.post("/{token_id}/upload-audio/")
 async def upload_audio_by_token_id(
     request: Request,
     token_id: str = Path(...),
@@ -248,7 +248,7 @@ async def upload_audio_by_token_id(
 
 
 # 2. 분석 결과를 수신할 웹훅 엔드포인트
-@router.post("/webhook/analysis-complete")
+@router.post("/webhook/analysis-complete/")
 async def receive_analysis(request: Request, db: Session = Depends(get_db)):
     from fastapi.responses import JSONResponse
     
@@ -296,7 +296,7 @@ async def receive_analysis(request: Request, db: Session = Depends(get_db)):
 
 
 # 3. 클라이언트가 조회할 수 있는 결과 조회 API
-@router.get("/analysis-result/{job_id}")
+@router.get("/analysis-result/{job_id}/")
 def get_analysis_result_api(job_id: str, db: Session = Depends(get_db)):
     """분석 결과 조회"""
     stored_data = get_analysis_result(db, job_id)
@@ -315,7 +315,7 @@ def get_analysis_result_api(job_id: str, db: Session = Depends(get_db)):
 
 
 # 4. 실시간 진행 상황을 위한 Server-Sent Events 엔드포인트
-@router.get("/analysis-progress/{job_id}")
+@router.get("/analysis-progress/{job_id}/")
 async def stream_analysis_progress(job_id: str):
     """실시간 진행 상황 스트리밍 (SSE)"""
     async def event_generator():
@@ -371,7 +371,7 @@ async def stream_analysis_progress(job_id: str):
     )
 
 # SQS 큐 상태 조회 API
-@router.get("/queue/status")
+@router.get("/queue/status/")
 def get_sqs_queue_status():
     """SQS 큐 상태 조회"""
     try:

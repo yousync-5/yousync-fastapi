@@ -14,7 +14,7 @@ router = APIRouter(prefix="/score", tags=["score"])
 
 
 @router.get(
-    "/{token_id}/score",
+    "/{token_id}/score/",
     response_model=TokenScore,
     summary="특정 토큰의 내 평균 점수 조회"
 )
@@ -50,7 +50,7 @@ def get_my_token_score(
 
 
 @router.get(
-    "/me/average",
+    "/me/average/",
     response_model=UserScore,
     summary="내 전체 평균 점수 조회"
 )
