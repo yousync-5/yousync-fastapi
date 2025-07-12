@@ -160,11 +160,14 @@ sequenceDiagram
 - `GET /tokens/analysis-progress/{job_id}` - 실시간 진행 상황 (SSE)
 - `POST /tokens/webhook/analysis-complete` - 분석 완료 웹훅
 
-### 데이터 관리
-- `GET /tokens` - 토큰 목록 조회
-- `GET /scripts/{token_id}` - 스크립트 조회
-- `GET /actors` - 배우 목록
-- `POST /bookmarks` - 북마크 추가/제거
+### 마이페이지 (핵심 기능)
+- `POST /mypage/bookmarks/` - 북마크 추가
+- `DELETE /mypage/bookmarks/{token_id}` - 북마크 삭제  
+- `GET /mypage/bookmarks/` - 북마크 목록 조회 (토큰 정보 포함)
+- `GET /mypage/my-dubbed-tokens` - 내가 더빙한 토큰 목록
+- `GET /mypage/tokens/{token_id}/analysis-status` - 토큰 분석 상태 확인
+- `DELETE /mypage/tokens/{token_id}/my-results` - 분석 결과 삭제 (재더빙용)
+- `GET /mypage/overview` - 마이페이지 통합 정보 (새로 구현)
 
 ### 모니터링
 - `GET /` - 서비스 상태 확인

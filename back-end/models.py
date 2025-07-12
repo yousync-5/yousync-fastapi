@@ -17,6 +17,7 @@ class Token(Base):
     s3_textgrid_url = Column(Text, nullable=True)
     s3_pitch_url = Column(Text, nullable=True)
     s3_bgvoice_url = Column(Text, nullable=True)
+    thumbnail_url = Column(Text, nullable=True)  # 썸네일 URL 추가
     youtube_url = Column(
         Text,
         ForeignKey("urls.youtube_url", ondelete="CASCADE"),  # 핵심!
@@ -49,7 +50,12 @@ class Token(Base):
         passive_deletes=True,
     )
     
-    analysis_results = relationship("AnalysisResult", back_populates="token", cascade="all, delete")
+    analysis_results = relationship(
+        "AnalysisResult", 
+        back_populates="token", 
+        cascade="all, delete",
+        passive_deletes=True
+    )
 
 
 class URL(Base):
@@ -221,52 +227,51 @@ class AnalysisResult(Base):
     __tablename__ = "analysis_results"
 
     id = Column(Integer, primary_key=True, index=True)
-
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False) ##로직 완성되면 nullable=False로 수정
-
     job_id = Column(String, unique=True, index=True)
-    token_id = Column(Integer,
-                ForeignKey("tokens.id", ondelete="CASCADE"),
-                  nullable=False)
-    user_id  = Column(Integer, 
-                ForeignKey("users.id", ondelete="CASCADE"), 
-                nullable=True, 
-                index=True)
-
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    
     status = Column(String, nullable=False)
     progress = Column(Integer, nullable=False)
     result = Column(JSON, nullable=True)  # analysis_results 점수만 저장
     message = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-    token = relationship("Token", back_populates="analysis_results") #??
-    user = relationship("User",back_populates="analysis_results")
+    # 관계
+    token = relationship("Token", back_populates="analysis_results")
+    user = relationship("User", back_populates="analysis_results")
     
 
 
 
 class Bookmark(Base):
     """
-    (user_id, token_id) 복합 Primary Key
+    북마크 테이블 - id를 primary key로 하고 (user_id, token_id)는 unique constraint
     → 같은 토큰을 중복 북마크하지 못하도록 보장
     """
     __tablename__ = "bookmarks"
 
-    user_id  = Column(Integer,
-                      ForeignKey("users.id", ondelete="CASCADE"),
-                      primary_key=True,
-                      index=True)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer,
+                     ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False,
+                     index=True)
     token_id = Column(Integer,
                       ForeignKey("tokens.id", ondelete="CASCADE"),
-                      primary_key=True,
+                      nullable=False,
                       index=True)
 
     created_at = Column(DateTime,
                         server_default=func.now(),
                         nullable=False)
 
+    # 중복 북마크 방지를 위한 유니크 제약조건
+    __table_args__ = (
+        UniqueConstraint("user_id", "token_id", name="uq_user_token_bookmark"),
+    )
+
     # 양방향 편의를 위한 관계
-    user  = relationship("User",  back_populates="bookmarks", passive_deletes=True)
+    user = relationship("User", back_populates="bookmarks", passive_deletes=True)
     token = relationship("Token", back_populates="bookmarked_by", passive_deletes=True)
 
 
