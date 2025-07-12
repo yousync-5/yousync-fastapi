@@ -62,6 +62,20 @@ def read_popular_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(g
     tokens = db.query(Token).order_by(Token.view_count.desc()).offset(skip).limit(limit).all()
     return tokens
 
+#카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
+@router.get("/category/{category}", response_model=List[TokenSchema])
+def read_tokens_by_category(category: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    특정 카테고리의 토큰들을 조회합니다.
+    
+    - **category**: 조회할 카테고리명
+    - **skip**: 건너뛸 항목 수 (기본값: 0) 
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
+    return tokens
+
+
 
 @router.get("/{token_id}", response_model=TokenDetail)
 async def read_token(
@@ -180,15 +194,3 @@ def increment_view(token_id: int, db: Session = Depends(get_db)):
     return {"token_id": token.id, "view_count": token.view_count}
 
 
-# 카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
-# @router.get("/category/{category}", response_model=List[TokenSchema])
-# def read_tokens_by_category(category: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-#     """
-#     특정 카테고리의 토큰들을 조회합니다.
-    
-#     - **category**: 조회할 카테고리명
-#     - **skip**: 건너뛸 항목 수 (기본값: 0) 
-#     - **limit**: 가져올 최대 항목 수 (기본값: 100)
-#     """
-#     tokens = db.query(Token).filter(Token.category.ilike(f"%{category}%")).offset(skip).limit(limit).all()
-#     return tokens
