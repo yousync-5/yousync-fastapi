@@ -77,7 +77,7 @@ def read_tokens_by_category(category: str, skip: int = 0, limit: int = 100, db: 
 
 
 
-@router.get("/{token_id}/", response_model=TokenDetail)
+@router.get("/{token_id}", response_model=TokenDetail)
 async def read_token(
     request: Request,
     token_id: int = Path(...),
@@ -103,7 +103,7 @@ async def read_token(
     )
 
 # 영화 수정 API - PUT 요청으로 기존 영화 데이터를 업데이트
-@router.put("/{token_id}/", response_model=TokenSchema)
+@router.put("/{token_id}", response_model=TokenSchema)
 def update_token(token_id: int, token: TokenCreate, db: Session = Depends(get_db)):
     """
     기존 토큰을 수정합니다.
@@ -121,7 +121,7 @@ def update_token(token_id: int, token: TokenCreate, db: Session = Depends(get_db
     return db_token
 
 # 영화 삭제 API - DELETE 요청으로 특정 영화를 삭제
-@router.delete("/{token_id}/")
+@router.delete("/{token_id}")
 def delete_token(token_id: int, db: Session = Depends(get_db)):
     """
     특정 ID의 토큰를 삭제합니다.

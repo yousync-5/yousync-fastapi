@@ -107,7 +107,7 @@ async def send_analysis_async(s3_url: str, script_obj: ScriptUser,
 router = APIRouter(prefix="/scripts", tags=["scripts"])
 
 # 1) 업로드 + 분석 요청
-@router.post("/{script_id}/upload-audio/")
+@router.post("/{script_id}/upload-audio")
 async def upload_script_audio(
     request: Request,
     script_id: int = Path(...),
@@ -156,7 +156,7 @@ async def upload_script_audio(
             "job_id": job_id, "status": "processing"}
 
 # 2) 분석 서버 웹훅
-@router.post("/webhook/analysis-complete/")
+@router.post("/webhook/analysis-complete")
 async def analysis_webhook(request: Request, db: Session = Depends(get_db)):
     # 웹훅 호출 로깅 추가
     logging.info("=" * 50)
@@ -183,7 +183,7 @@ async def analysis_webhook(request: Request, db: Session = Depends(get_db)):
     return {"received": True, "job_id": job_id}
 
 # 3) 결과 조회
-@router.get("/analysis-result/{job_id}/")
+@router.get("/analysis-result/{job_id}")
 def get_result(job_id: str, db: Session = Depends(get_db)):
     r = get_script_result(db, job_id)
     if not r:
@@ -200,7 +200,7 @@ def get_result(job_id: str, db: Session = Depends(get_db)):
     }
 
 # 4) SSE 진행 스트림
-@router.get("/analysis-progress/{job_id}/")
+@router.get("/analysis-progress/{job_id}")
 async def stream_progress(job_id: str):
     async def gen():
         while True:

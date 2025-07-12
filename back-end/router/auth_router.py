@@ -138,7 +138,7 @@ def get_current_user(
     return user
 
 
-@router.post("/google-login/", response_model=AuthToken, summary="구글 로그인/회원가입")
+@router.post("/google-login", response_model=AuthToken, summary="구글 로그인/회원가입")
 async def google_login(
     google_request: GoogleLoginRequest,
     db: Session = Depends(get_db)
@@ -246,7 +246,7 @@ async def google_login(
         )
 
 
-@router.get("/me/", response_model=UserResponse, summary="현재 사용자 정보 조회")
+@router.get("/me", response_model=UserResponse, summary="현재 사용자 정보 조회")
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
@@ -302,7 +302,7 @@ async def refresh_token(
     )
 
 
-@router.post("/logout/", summary="로그아웃")
+@router.post("/logout", summary="로그아웃")
 async def logout(
     current_user: User = Depends(get_current_user)
 ):
