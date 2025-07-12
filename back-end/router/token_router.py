@@ -41,6 +41,17 @@ def read_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     tokens = db.query(Token).offset(skip).limit(limit).all()  # SQL: SELECT * FROM movies LIMIT 100 OFFSET 0
     return tokens
 
+@router.get("/latest", response_model=List[TokenSchema])
+def read_latest_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    최신순으로 정렬된 토큰 목록을 조회합니다.
+    
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    tokens = db.query(Token).order_by(Token.id.desc()).offset(skip).limit(limit).all()
+    return tokens
+
 @router.get("/popular", response_model=List[TokenSchema])
 def read_popular_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
