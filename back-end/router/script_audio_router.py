@@ -129,11 +129,27 @@ def build_script_user(db: Session, script_id: int) -> ScriptUser:
     return ScriptUser(id=script.id, words=words)
 
 # ────────────── 비동기 유틸 ──────────────
-async def upload_to_s3_async(s3_client, file_bytes: bytes, filename: str) -> str:
+async def upload_to_s3_async(s3_client, file_bytes: bytes, filename: str, user_id: Optional[str], token_id: int, script_id: int) -> str:
     def _sync():
-        key = f"audio/{uuid4().hex}_{filename}"
-        s3_client.upload_fileobj(io.BytesIO(file_bytes), S3_BUCKET, key)
+        # 파일 확장자 추출, 없으면 'mp3' 기본 사용
+        file_extension = filename.split('.')[-1] if '.' in filename else 'mp3'
+        
+        # 로그인 사용자인 경우 user_id, token_id, script_id로 키 생성
+        if user_id:
+            key = f"user_audio/{user_id}/{token_id}/{script_id}.{file_extension}"
+        # 익명 사용자인 경우 기존 방식대로 랜덤 키 생성
+        else:
+            key = f"audio/{uuid4().hex}_{filename}"
+        
+        # S3에 파일 업로드 (덮어쓰기)
+        s3_client.upload_fileobj(
+            io.BytesIO(file_bytes), 
+            S3_BUCKET, 
+            key,
+            ExtraArgs={'ContentType': 'audio/mpeg'} # ContentType 명시
+        )
         return key
+
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor() as ex:
         return await loop.run_in_executor(ex, _sync)
@@ -213,11 +229,11 @@ async def upload_script_audio(
     user_id = current_user.id if current_user else None
     create_script_result(db, job_id, token_id=script.token_id, user_id=user_id)
 
-    async def bg_work(client_):
+    async def bg_work(client_, user_id_, token_id_, script_id_):
         bg_db = SessionLocal()
         try:
             update_script_result(bg_db, job_id, progress=40, message="S3 업로드")
-            key   = await upload_to_s3_async(client_, file_bytes, file.filename)
+            key   = await upload_to_s3_async(client_, file_bytes, file.filename, user_id_, token_id_, script_id_)
             s3url = f"s3://{S3_BUCKET}/{key}"
 
             update_script_result(bg_db, job_id, progress=70, message="분석 서버 호출")
@@ -234,7 +250,7 @@ async def upload_script_audio(
         finally:
             bg_db.close()
 
-    background_tasks.add_task(bg_work, s3_client)
+    background_tasks.add_task(bg_work, s3_client, user_id, script.token_id, script_id)
     return {"message": "업로드 완료, 분석 시작",
             "job_id": job_id, "status": "processing"}
 
