@@ -9,13 +9,75 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from database import get_db, SessionLocal
-from models import Script, AnalysisResult
+from models import Script, AnalysisResult, User
 from schemas import ScriptUser, ScriptWordUser      # ★ Pydantic 스키마
+from router.auth_router import get_current_user     # 인증 함수 import
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from datetime import datetime, timedelta
+
+# ────────────── 스케줄러 초기화 ──────────────
+scheduler = AsyncIOScheduler()
+
+# ────────────── 선택적 인증 함수 ──────────────
+security = HTTPBearer(auto_error=False)  # auto_error=False로 설정
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    선택적 인증: 토큰이 있으면 사용자 반환, 없으면 None 반환
+    """
+    if not credentials:
+        return None
+    
+    try:
+        from router.auth_router import verify_token
+        token = credentials.credentials
+        payload = verify_token(token)
+        
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        return user
+    except:
+        return None
 
 # ──────────────────────────────────────────────────
 S3_BUCKET   = os.getenv("S3_BUCKET_NAME")
 TARGET_URL  = os.getenv("SCRIPT_TARGET_SERVER_URL")
 WEBHOOK_URL = os.getenv("SCRIPT_WEBHOOK_URL")
+
+# ────────────── 익명 사용자 결과 배치 삭제 ──────────────
+async def cleanup_anonymous_results():
+    """
+    user_id가 NULL인 익명 사용자의 분석 결과를 배치로 삭제
+    1분 이상 된 레코드들만 삭제
+    """
+    db = SessionLocal()
+    try:
+        # 10초 이상 된 익명 사용자 결과들 삭제 (테스트용)
+        deleted_count = db.query(AnalysisResult).filter(
+            AnalysisResult.user_id.is_(None),
+            AnalysisResult.created_at < datetime.utcnow() - timedelta(seconds=60)
+        ).delete(synchronize_session=False)
+        
+        db.commit()
+        
+        if deleted_count > 0:
+            logging.info(f"[배치 삭제 완료] 익명 사용자 결과 {deleted_count}개 삭제됨")
+        else:
+            logging.info("[배치 삭제] 삭제할 익명 사용자 결과 없음")
+            
+    except Exception as e:
+        logging.error(f"[배치 삭제 실패] error={e}")
+        db.rollback()
+    finally:
+        db.close()
 
 # ────────────── DB 헬퍼 ──────────────
 def create_script_result(db: Session, job_id: str, token_id: int , user_id: int = None):
@@ -106,6 +168,24 @@ async def send_analysis_async(s3_url: str, script_obj: ScriptUser,
 # ────────────── Router ──────────────
 router = APIRouter(prefix="/scripts", tags=["scripts"])
 
+# ────────────── 스케줄러 시작 ──────────────
+def start_cleanup_scheduler():
+    """익명 사용자 결과 정리 스케줄러 시작"""
+    if not scheduler.running:
+        # 1분마다 배치 삭제 실행
+        scheduler.add_job(
+            cleanup_anonymous_results,
+            'interval',
+            minutes=1,
+            id='cleanup_anonymous_results',
+            replace_existing=True
+        )
+        scheduler.start()
+        logging.info("[스케줄러 시작] 익명 사용자 결과 1분마다 자동 삭제 시작")
+
+# 스케줄러 시작
+start_cleanup_scheduler()
+
 # 1) 업로드 + 분석 요청
 @router.post("/{script_id}/upload-audio")
 async def upload_script_audio(
@@ -114,6 +194,7 @@ async def upload_script_audio(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),  # 🔓 선택적 인증
 ):
     script = db.query(Script).filter_by(id=script_id).first()
 
@@ -128,7 +209,9 @@ async def upload_script_audio(
     job_id      = uuid4().hex
     file_bytes  = await file.read()
 
-    create_script_result(db, job_id, token_id=script.token_id)
+    # 로그인한 사용자가 있으면 user_id 저장, 없으면 None
+    user_id = current_user.id if current_user else None
+    create_script_result(db, job_id, token_id=script.token_id, user_id=user_id)
 
     async def bg_work(client_):
         bg_db = SessionLocal()
@@ -175,7 +258,8 @@ async def analysis_webhook(request: Request, db: Session = Depends(get_db)):
     logging.info(f"[웹훅 데이터] 받은 결과 크기: {len(str(payload))} 문자")
     logging.info(f"[웹훅 데이터] 결과 키들: {list(payload.keys()) if isinstance(payload, dict) else 'Not dict'}")
     
-    update_script_result(db, job_id, status="completed",
+    # 분석 완료 상태로 업데이트
+    analysis_result = update_script_result(db, job_id, status="completed",
                          progress=100, result=payload, message="분석 완료")
     
     logging.info(f"[✅ 웹훅 처리 완료] job_id={job_id}")
@@ -198,6 +282,13 @@ def get_result(job_id: str, db: Session = Depends(get_db)):
         "message":   r.message,
         "created_at": r.created_at,
     }
+
+# 🧹 배치 삭제 API (수동 실행용)
+@router.post("/cleanup/anonymous-results")
+async def manual_cleanup_anonymous_results():
+    """수동으로 익명 사용자 결과 배치 삭제 실행"""
+    await cleanup_anonymous_results()
+    return {"message": "익명 사용자 결과 정리 작업 완료"}
 
 # 4) SSE 진행 스트림
 @router.get("/analysis-progress/{job_id}")
