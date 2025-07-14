@@ -1,12 +1,12 @@
 # app/routers/score_router.py
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 
 from database import get_db
 from models import AnalysisResult, User
-from schemas import TokenScore, UserScore
+from schemas import TokenScore, UserScore, LeaderboardResponse, TopUser
 from router.auth_router import get_current_user
 
 
@@ -79,4 +79,37 @@ def get_my_overall_average_score(
         user_id=current_user.id,
         average_score=round(avg_score, 2)
     )
+
+@router.get("/leaderboard/top-recorders", response_model=LeaderboardResponse, summary="녹음 횟수 랭킹 TOP 3")
+def get_top_recorders(db: Session = Depends(get_db)):
+    """
+    가장 많은 문장을 녹음한 상위 3명의 사용자 정보를 반환합니다.
+    """
+    top_users_query = (
+        db.query(
+            User.id,
+            User.email,
+            User.full_name,
+            User.profile_picture,
+            func.count(AnalysisResult.id).label("recording_count"),
+        )
+        .join(AnalysisResult, User.id == AnalysisResult.user_id)
+        .group_by(User.id)
+        .order_by(desc("recording_count"))
+        .limit(3)
+        .all()
+    )
+
+    top_users = [
+        TopUser(
+            user_id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            profile_picture=user.profile_picture,
+            recording_count=user.recording_count,
+        )
+        for user in top_users_query
+    ]
+
+    return LeaderboardResponse(users=top_users)
 

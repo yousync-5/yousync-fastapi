@@ -251,3 +251,18 @@ class MyPageOverviewResponse(BaseModel):
         from_attributes = True
 
 
+# === Leaderboard Schemas ===
+class TopUser(BaseModel):
+    user_id: int
+    email: str
+    full_name: Optional[str] = None
+    profile_picture: Optional[str] = None
+    recording_count: int
+
+    class Config:
+        from_attributes = True
+
+class LeaderboardResponse(BaseModel):
+    users: List[TopUser]
+
+

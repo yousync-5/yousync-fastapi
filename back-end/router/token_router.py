@@ -194,3 +194,65 @@ def increment_view(token_id: int, db: Session = Depends(get_db)):
     return {"token_id": token.id, "view_count": token.view_count}
 
 
+# ────────────── 추가 임포트 ──────────────
+import os
+from typing import Optional
+from pydantic import BaseModel, Field
+from router.auth_router import get_current_user
+from models import User
+
+# ────────────── S3 설정 ──────────────
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
+
+# ────────────── 응답 스키마 ──────────────
+class AudioURL(BaseModel):
+    script_id: int
+    url: str
+
+class UserAudioResponse(BaseModel):
+    audios: List[AudioURL]
+
+# ────────────── API 엔드포인트 ──────────────
+@router.get("/{token_id}/user-audios", response_model=UserAudioResponse)
+def get_user_audios_for_token(
+    request: Request,
+    token_id: int = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 토큰에 대해 현재 로그인한 사용자가 녹음한 모든 음성 파일의
+    임시 접근 URL(presigned URL) 목록을 반환합니다.
+    """
+    s3_client = request.app.state.s3_client
+    user_id = current_user.id
+
+    # S3에서 해당 사용자의 토큰 관련 음성 파일 목록 조회
+    prefix = f"user_audio/{user_id}/{token_id}/"
+    try:
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"S3에서 파일 목록을 가져오는 중 오류 발생: {e}")
+
+    audio_urls = []
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            key = obj['Key']
+            # 파일 키에서 script_id 추출 (예: user_audio/1/10/101.mp3 -> 101)
+            try:
+                script_id_str = key.split('/')[-1].split('.')[0]
+                script_id = int(script_id_str)
+            except (ValueError, IndexError):
+                continue  # 파싱할 수 없는 형식의 파일은 건너뜀
+
+            # Presigned URL 생성
+            presigned_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': S3_BUCKET, 'Key': key},
+                ExpiresIn=3600  # 1시간 동안 유효
+            )
+            audio_urls.append(AudioURL(script_id=script_id, url=presigned_url))
+
+    return UserAudioResponse(audios=audio_urls)
+
+
