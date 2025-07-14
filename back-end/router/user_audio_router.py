@@ -10,6 +10,7 @@ from database import get_db
 from sqlalchemy.orm import Session
 from models import Token, AnalysisResult, User
 from services.sqs_service import sqs_service
+from router.auth_router import get_current_user  # 인증 함수 import
 
 
 async def get_token_by_id(token_id: str, db:Session):
@@ -19,10 +20,11 @@ async def get_token_by_id(token_id: str, db:Session):
     return token
 
 # DB 헬퍼 함수들
-def create_analysis_result(db: Session, job_id: str, token_id: int, status: str = "processing", progress: int = 10, message: str = "업로드 시작"):
+def create_analysis_result(db: Session, job_id: str, token_id: int, user_id: int = None, status: str = "processing", progress: int = 10, message: str = "업로드 시작"):
     analysis_result = AnalysisResult(
         job_id=job_id,
         token_id=token_id,
+        user_id=user_id,  # 사용자 ID 추가
         status=status,
         progress=progress,
         message=message
@@ -142,7 +144,7 @@ async def upload_audio_by_token_id(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    #current_user: User = Depends(get_current_user)  # 🔐 로그인한 사용자만 호출 가능
+    current_user: User = Depends(get_current_user)  # 🔐 로그인한 사용자만 호출 가능
     
 ):
     try:
@@ -152,7 +154,7 @@ async def upload_audio_by_token_id(
         token_info = await get_token_by_id(token_id, db)
         
         # DB에 초기 상태 저장
-        analysis_result = create_analysis_result(db, job_id, int(token_id))
+        analysis_result = create_analysis_result(db, job_id, int(token_id), current_user.id)
 
         # 백그라운드에서 완전 비동기 처리
         async def process_in_background(s3_client_bg):
