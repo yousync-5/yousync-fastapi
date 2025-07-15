@@ -266,3 +266,24 @@ class LeaderboardResponse(BaseModel):
     users: List[TopUser]
 
 
+# === Youtube Process Schemas ===
+class YoutubeProcessRequest(BaseModel):
+    youtube_url: str
+    movie_name: str
+    actor_name: str
+
+class YoutubeProcessResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str
+    token_id: Optional[int] = None
+
+class YoutubeProcessStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    message: str
+    token_id: Optional[int] = None
+    result: Optional[Any] = None
+
+

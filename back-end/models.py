@@ -275,6 +275,21 @@ class Bookmark(Base):
     token = relationship("Token", back_populates="bookmarked_by", passive_deletes=True)
 
 
+class YoutubeProcessJob(Base):
+    __tablename__ = "youtube_process_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    status = Column(String, nullable=False) # processing, completed, failed
+    progress = Column(Integer, nullable=False) # 0-100
+    message = Column(String, nullable=True)
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="SET NULL"), nullable=True, index=True)
+    result = Column(JSON, nullable=True) # 전처리 서버에서 받은 최종 결과 (예: token_id, 기타 메타데이터)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
 # 점수 조회용 모델
 # class UserTokenScore(Base):
 #     __tablename__ = "user_token_scores"
