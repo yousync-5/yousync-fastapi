@@ -54,7 +54,7 @@ async def send_preprocess_request_async(
     try:
         async with httpx.AsyncClient(timeout=300.0) as client: # 전처리 시간 고려하여 타임아웃 5분 설정
             resp = await client.post(
-                f"{PREPROCESS_SERVER_URL}/process_youtube",
+                f"{PREPROCESS_SERVER_URL}/process",
                 json=payload
             )
             resp.raise_for_status()
