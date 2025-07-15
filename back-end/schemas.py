@@ -288,3 +288,14 @@ class YoutubeProcessStatusResponse(BaseModel):
     result: Optional[Any] = None
 
 
+# === Duet Schemas ===
+class DuetScene(BaseModel):
+    youtube_url: str
+    thumbnail_url: Optional[str] = None
+    scene_title: str
+    duet_pair: List[Token]
+
+    class Config:
+        from_attributes = True
+
+
