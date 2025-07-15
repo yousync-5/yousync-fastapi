@@ -284,6 +284,7 @@ class YoutubeProcessStatusResponse(BaseModel):
     progress: int
     message: str
     token_id: Optional[int] = None
+    token_ids: Optional[List[int]] = None
     result: Optional[Any] = None
 
 

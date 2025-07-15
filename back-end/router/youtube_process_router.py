@@ -129,27 +129,27 @@ async def process_complete_webhook(request: Request, db: Session = Depends(get_d
     payload = await request.json()
     logging.info(f"[웹훅 데이터] 받은 결과: {payload}")
     
-    token_id = payload.get("token_id")
+    token_ids = payload.get("token_ids")
     status = payload.get("status", "completed")
     message = payload.get("message", "전처리 완료")
     
-    if token_id:
-        # token_id가 있으면 성공으로 간주하고 업데이트
+    if token_ids:
+        # token_ids가 있으면 성공으로 간주하고 업데이트
         update_youtube_process_job(db, job_id, 
                                status=status, 
                                progress=100, 
                                result=payload, 
                                message=message,
-                               token_id=token_id)
-        logging.info(f"[✅ 웹훅 처리 완료] job_id={job_id}, token_id={token_id}")
+                               token_id=token_ids[0] if token_ids else None)
+        logging.info(f"[✅ 웹훅 처리 완료] job_id={job_id}, token_ids={token_ids}")
     else:
-        # token_id가 없으면 실패로 간주
+        # token_ids가 없으면 실패로 간주
         update_youtube_process_job(db, job_id, 
                                status="failed", 
                                progress=0, 
                                result=payload, 
-                               message=message or "전처리 실패: token_id 없음")
-        logging.error(f"[❌ 웹훅 처리 실패] job_id={job_id}, token_id 없음")
+                               message=message or "전처리 실패: token_ids 없음")
+        logging.error(f"[❌ 웹훅 처리 실패] job_id={job_id}, token_ids 없음")
 
     logging.info("=" * 50)
     return {"received": True, "job_id": job_id}
@@ -161,12 +161,15 @@ def get_process_status(job_id: str, db: Session = Depends(get_db)):
     if not ar:
         raise HTTPException(404, "결과를 찾을 수 없습니다.")
     
+    token_ids = ar.result.get("token_ids") if ar.result else None
+
     return YoutubeProcessStatusResponse(
         job_id=ar.job_id,
         status=ar.status,
         progress=ar.progress,
         message=ar.message,
         token_id=ar.token_id,
+        token_ids=token_ids,
         result=ar.result
     )
 
@@ -181,19 +184,23 @@ async def stream_process_progress(job_id: str):
                 if not ar:
                     yield "data: {\"error\":\"Job not found\"}\n\n"
                     break
+                
+                token_ids = ar.result.get("token_ids") if ar.result else None
+                
                 data = {
                     "job_id":   ar.job_id,
                     "status":   ar.status,
                     "progress": ar.progress,
                     "message":  ar.message,
                     "token_id": ar.token_id,
+                    "token_ids": token_ids,
                     "result":   ar.result,
                 }
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 if ar.status in ("completed", "failed"): break
             finally:
                 db.close()
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control":"no-cache",
                                       "Connection":"keep-alive",
