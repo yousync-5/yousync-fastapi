@@ -9,7 +9,7 @@ from database import get_db
 
 router = APIRouter(prefix="/urls", tags=["urls"])
 
-@router.post("/check/", response_model=UrlExistsResponse)
+@router.post("/check", response_model=UrlExistsResponse)
 def check_url(request: UrlCheckRequest, db: Session = Depends(get_db)):
     exists = (
         db.query(URL)
@@ -19,7 +19,7 @@ def check_url(request: UrlCheckRequest, db: Session = Depends(get_db)):
     return UrlExistsResponse(exists=exists)
     
 
-@router.get("/tokens/", response_model=List[Token])
+@router.get("/tokens", response_model=List[Token])
 def list_tokens(
     youtube_url: str = Query(..., description="검색할 YouTube URL"),
     db: Session = Depends(get_db),
