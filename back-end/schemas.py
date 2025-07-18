@@ -179,6 +179,7 @@ class TokenInfo(BaseModel):
     actor_name: str
     category: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    youtube_url: Optional[str] = None  # youtube_url 필드 추가
     
     class Config:
         from_attributes = True
@@ -200,6 +201,7 @@ class MyDubbedTokenResponse(BaseModel):
     token_name: str
     actor_name: str
     category: Optional[str] = None
+    youtube_url: Optional[str] = None # youtube_url 추가
     last_dubbed_at: datetime
     total_scripts: int
     completed_scripts: int

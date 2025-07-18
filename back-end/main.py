@@ -82,17 +82,29 @@ app.add_middleware(
 )
 
 # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
-app.include_router(auth_router, prefix="/api")    # /auth 경로로 인증 관련 API 등록
-app.include_router(actor_router, prefix="/api")   # /actors 경로로 배우 관련 API 등록
-app.include_router(token_router, prefix="/api")   # /tokens 경로로 토큰 관련 API 등록
-app.include_router(script_router, prefix="/api")  # /scripts 경로로 스크립트 관련 API 등록
-app.include_router(user_audio_router, prefix="/api") # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
-app.include_router(mypage_router, prefix="/api") # /mapage 결로로 스크립트 관련 API 등록
-app.include_router(script_audio_router, prefix="/api")
-app.include_router(url_router, prefix="/api") # url 관련 라우터
-app.include_router(score_router, prefix="/api") # /score 경로로 점수 관련 API 등록
-app.include_router(youtube_process_router, prefix="/api") # /youtube 경로로 유튜브 전처리 관련 API 등록
-app.include_router(duet_router, prefix="/api")    # /duet 경로로 듀엣 관련 API 등록
+app.include_router(auth_router)    # /auth 경로로 인증 관련 API 등록
+app.include_router(actor_router)   # /actors 경로로 배우 관련 API 등록
+app.include_router(token_router)   # /tokens 경로로 토큰 관련 API 등록
+app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
+app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
+app.include_router(mypage_router) # /mapage 결로로 스크립트 관련 API 등록
+app.include_router(script_audio_router)
+app.include_router(url_router) # url 관련 라우터
+app.include_router(score_router) # /score 경로로 점수 관련 API 등록
+app.include_router(youtube_process_router) # /youtube 경로로 유튜브 전처리 관련 API 등록
+app.include_router(duet_router)    # /duet 경로로 듀엣 관련 API 등록
+# # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
+# app.include_router(auth_router, prefix="/api")    # /auth 경로로 인증 관련 API 등록
+# app.include_router(actor_router, prefix="/api")   # /actors 경로로 배우 관련 API 등록
+# app.include_router(token_router, prefix="/api")   # /tokens 경로로 토큰 관련 API 등록
+# app.include_router(script_router, prefix="/api")  # /scripts 경로로 스크립트 관련 API 등록
+# app.include_router(user_audio_router, prefix="/api") # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
+# app.include_router(mypage_router, prefix="/api") # /mapage 결로로 스크립트 관련 API 등록
+# app.include_router(script_audio_router, prefix="/api")
+# app.include_router(url_router, prefix="/api") # url 관련 라우터
+# app.include_router(score_router, prefix="/api") # /score 경로로 점수 관련 API 등록
+# app.include_router(youtube_process_router, prefix="/api") # /youtube 경로로 유튜브 전처리 관련 API 등록
+# app.include_router(duet_router, prefix="/api")    # /duet 경로로 듀엣 관련 API 등록
 
 # 루트 엔드포인트 - API 서버 상태 확인용
 @app.get("/")

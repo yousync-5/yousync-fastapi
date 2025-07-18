@@ -2,6 +2,7 @@
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, delete, func, desc
@@ -39,18 +40,30 @@ def create_bookmark(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Token not found",
         )
+    
+    # 1-1) 이미 북마크가 존재하는지 명시적으로 확인
+    existing_bookmark = db.query(Bookmark).filter(
+        Bookmark.user_id == current_user.id,
+        Bookmark.token_id == data.token_id
+    ).first()
+    
+    if existing_bookmark:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Already bookmarked - Detected by explicit check",
+        )
 
     # 2) Bookmark 삽입
     bm = Bookmark(user_id=current_user.id, token_id=data.token_id)
     db.add(bm)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        # 이미 북마크된 경우
+        # 이미 북마크된 경우 (더 자세한 에러 메시지 제공)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Already bookmarked",
+            detail=f"Already bookmarked - IntegrityError: {str(e)}",
         )
     db.refresh(bm)
     return bm
@@ -66,24 +79,39 @@ def delete_bookmark(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 먼저 북마크가 존재하는지 확인
     bookmark = db.query(Bookmark).filter(
         Bookmark.user_id == current_user.id,
         Bookmark.token_id == token_id,
     ).first()
     
     if not bookmark:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Bookmark not found",
-        )
+        # 디버깅을 위해 404 대신 200 응답으로 변경하고 메시지 추가
+        return {
+            "status": "not_found",
+            "message": f"북마크를 찾을 수 없습니다. user_id: {current_user.id}, token_id: {token_id}",
+            "user_id": current_user.id
+        }
     
+    # 북마크 삭제
     db.delete(bookmark)
-    db.commit()
+    try:
+        db.commit()
+        return {
+            "status": "success",
+            "message": "북마크가 성공적으로 삭제되었습니다."
+        }
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"북마크 삭제 중 오류 발생: {str(e)}"
+        }
 
 
 # --- 북마크 목록 조회 (토큰 정보 포함) -----------------------------------
 @router.get(
-    "/bookmarks/",
+    "/bookmarks",
     response_model=List[BookmarkListOut],
 )
 def list_bookmarks(
@@ -92,6 +120,11 @@ def list_bookmarks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 디버깅을 위해 먼저 사용자 ID와 북마크 수를 확인
+    bookmark_count = db.query(func.count(Bookmark.id)).filter(
+        Bookmark.user_id == current_user.id
+    ).scalar()
+    
     # JOIN을 통해 토큰 정보도 함께 가져오기
     bookmarks = (
         db.query(Bookmark)
@@ -116,9 +149,21 @@ def list_bookmarks(
                 token_name=bookmark.token.token_name,
                 actor_name=bookmark.token.actor_name,
                 category=bookmark.token.category,
-                thumbnail_url=getattr(bookmark.token, 'thumbnail_url', None)
+                thumbnail_url=getattr(bookmark.token, 'thumbnail_url', None),
+                youtube_url=getattr(bookmark.token, 'youtube_url', None)  # youtube_url 추가
             )
         ))
+    
+    # 디버깅 정보 추가
+    if not result:
+        # response_model을 무시하고 디버깅 정보 반환
+        return JSONResponse(content={
+            "debug_info": {
+                "user_id": current_user.id,
+                "bookmark_count": bookmark_count,
+                "message": "북마크가 없거나 조회 중 문제가 발생했습니다."
+            }
+        })
     
     return result
 
@@ -145,6 +190,7 @@ def get_my_dubbed_tokens(
             Token.token_name,
             Token.actor_name, 
             Token.category,
+            Token.youtube_url, # youtube_url 추가
             func.max(AnalysisResult.created_at).label('last_dubbed_at'),
             func.count(func.distinct(Script.id)).label('total_scripts'),
             func.count(AnalysisResult.id).label('completed_scripts')
@@ -152,7 +198,7 @@ def get_my_dubbed_tokens(
         .join(AnalysisResult, AnalysisResult.token_id == Token.id)
         .join(Script, Script.token_id == Token.id)
         .filter(AnalysisResult.user_id == current_user.id)
-        .group_by(Token.id, Token.token_name, Token.actor_name, Token.category)
+        .group_by(Token.id, Token.token_name, Token.actor_name, Token.category, Token.youtube_url) # youtube_url 추가
         .order_by(desc('last_dubbed_at'))
         .limit(limit)
         .offset(offset)
@@ -167,6 +213,7 @@ def get_my_dubbed_tokens(
             token_name=row.token_name,
             actor_name=row.actor_name,
             category=row.category,
+            youtube_url=row.youtube_url, # youtube_url 추가
             last_dubbed_at=row.last_dubbed_at,
             total_scripts=row.total_scripts,
             completed_scripts=row.completed_scripts
@@ -341,7 +388,7 @@ def get_mypage_overview(
         .options(joinedload(Bookmark.token))
         .filter(Bookmark.user_id == current_user.id)
         .order_by(Bookmark.created_at.desc())
-        .limit(5)
+        #.limit(5)
         .all()
     )
     
@@ -357,7 +404,8 @@ def get_mypage_overview(
                 token_name=bookmark.token.token_name,
                 actor_name=bookmark.token.actor_name,
                 category=bookmark.token.category,
-                thumbnail_url=getattr(bookmark.token, 'thumbnail_url', None)
+                thumbnail_url=getattr(bookmark.token, 'thumbnail_url', None),
+                youtube_url=getattr(bookmark.token, 'youtube_url', None)  # youtube_url 추가
             )
         ))
     
@@ -368,6 +416,7 @@ def get_mypage_overview(
             Token.token_name,
             Token.actor_name, 
             Token.category,
+            Token.youtube_url, # youtube_url 추가
             func.max(AnalysisResult.created_at).label('last_dubbed_at'),
             func.count(func.distinct(Script.id)).label('total_scripts'),
             func.count(AnalysisResult.id).label('completed_scripts')
@@ -375,9 +424,9 @@ def get_mypage_overview(
         .join(AnalysisResult, AnalysisResult.token_id == Token.id)
         .join(Script, Script.token_id == Token.id)
         .filter(AnalysisResult.user_id == current_user.id)
-        .group_by(Token.id, Token.token_name, Token.actor_name, Token.category)
+        .group_by(Token.id, Token.token_name, Token.actor_name, Token.category, Token.youtube_url) # youtube_url 추가
         .order_by(desc('last_dubbed_at'))
-        .limit(5)
+        #.limit(5)
         .all()
     )
     
@@ -388,6 +437,7 @@ def get_mypage_overview(
             token_name=row.token_name,
             actor_name=row.actor_name,
             category=row.category,
+            youtube_url=row.youtube_url, # youtube_url 추가
             last_dubbed_at=row.last_dubbed_at,
             total_scripts=row.total_scripts,
             completed_scripts=row.completed_scripts
