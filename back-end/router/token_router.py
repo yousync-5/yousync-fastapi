@@ -169,7 +169,7 @@ def read_related_tokens(token_id: int, skip: int = 0, limit: int = 5, db: Sessio
 
 
 # token 조회수 상승 API
-@router.post("/{token_id}/view/", response_model=ViewCountResponse)
+@router.post("/{token_id}/view", response_model=ViewCountResponse)
 def increment_view(token_id: int, db: Session = Depends(get_db)):
     token = db.query(Token).filter(Token.id == token_id).first()
     if not token:

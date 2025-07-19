@@ -1,8 +1,10 @@
 import os, boto3, json, urllib.parse, httpx, logging
 from typing import Any, Optional
+import io
+from pydub import AudioSegment
 
 # 기본 버킷 이름을 환경 변수 또는 상수로 설정
-DEFAULT_BUCKET = os.getenv("AWS_S3_BUCKET_NAME", "testgrid-pitch-bgvoice-yousync")
+DEFAULT_BUCKET = os.getenv("S3_BUCKET_NAME")
 
 def _parse_s3(url: str) -> Optional[tuple[str, str]]:
     if not url:
@@ -56,3 +58,32 @@ def presign(s3_client, url: Optional[str], exp: int = 900) -> Optional[str]:
         )
     # S3 경로가 아니라고 판단된 경우 원본 그대로 반환 (이미 퍼블릭 URL 등)
     return url
+
+#==========================# 병합 더빙 음성 제공용
+
+s3 = boto3.client("s3")
+
+def load_user_audio_from_s3(user_id: int, token_id: int, script_id: int) -> AudioSegment | None:
+    key = f"user_audio/{user_id}/{token_id}/{script_id}.wav"
+    try:
+        print(f"☁️ S3에서 사용자 음성 로딩 중: s3://{DEFAULT_BUCKET}/{key}")
+        response = s3.get_object(Bucket=DEFAULT_BUCKET, Key=key)
+        audio_bytes = io.BytesIO(response["Body"].read())
+        return AudioSegment.from_file(audio_bytes, format="wav")
+    except Exception as e:
+        logging.warning(f"⚠️ 사용자 음성 로딩 실패: {key} → {e}")
+        return None
+
+
+def load_main_audio_from_s3(actor_name: str, video_id: str):
+    base_prefix = f"{actor_name}/{video_id}/0"
+
+    def load_file(key):
+        print(f"☁️ S3에서 로딩 중: {key}")
+        response = s3.get_object(Bucket=DEFAULT_BUCKET, Key=key)
+        return AudioSegment.from_file(io.BytesIO(response["Body"].read()), format="wav")
+
+    vocal = load_file(f"{base_prefix}/vocal.wav")
+    bgvoice = load_file(f"{base_prefix}/bgvoice.wav")
+
+    return bgvoice, vocal  # background, original
