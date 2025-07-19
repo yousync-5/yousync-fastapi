@@ -153,6 +153,21 @@ async def upload_audio_by_token_id(
         file_data = await file.read()
         token_info = await get_token_by_id(token_id, db)
         
+        # 같은 사용자의 같은 토큰에 대한 이전 분석 결과 삭제
+        if current_user:
+            # 이전 분석 결과 조회
+            previous_results = db.query(AnalysisResult).filter(
+                AnalysisResult.token_id == int(token_id),
+                AnalysisResult.user_id == current_user.id
+            ).all()
+            
+            # 이전 결과 삭제
+            if previous_results:
+                logging.info(f"사용자 {current_user.id}의 토큰 {token_id}에 대한 이전 분석 결과 {len(previous_results)}개 삭제")
+                for result in previous_results:
+                    db.delete(result)
+                db.commit()
+        
         # DB에 초기 상태 저장
         analysis_result = create_analysis_result(db, job_id, int(token_id), current_user.id)
 
@@ -269,9 +284,14 @@ async def receive_analysis(request: Request, db: Session = Depends(get_db)):
         logging.warning("[❗경고] job_id 없이 webhook 도착. 무시됨")
         return JSONResponse(status_code=400, content={"error": "job_id is required"})
 
+    # 현재 job_id에 해당하는 분석 결과 조회
+    current_result = get_analysis_result(db, job_id)
+    if not current_result:
+        logging.warning(f"[❗경고] job_id={job_id}에 해당하는 분석 결과를 찾을 수 없음")
+        return JSONResponse(status_code=404, content={"error": "Analysis result not found"})
+    
     # 이미 완료된 job_id인지 확인
-    existing_result = get_analysis_result(db, job_id)
-    if existing_result and existing_result.status == "completed":
+    if current_result.status == "completed":
         logging.info(f"[중복 요청 무시] job_id={job_id}는 이미 완료된 상태")
         return {"received": True, "job_id": job_id, "message": "이미 완료된 작업"}
 
