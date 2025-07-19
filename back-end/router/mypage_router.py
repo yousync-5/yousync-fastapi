@@ -1,7 +1,6 @@
 # routers/mypage.py
 
 from typing import List
-import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
@@ -222,9 +221,6 @@ def get_token_analysis_status(
     특정 토큰에 대한 현재 유저의 분석 결과 존재 여부와 상세 정보를 반환합니다.
     더빙 기록이 있으면 결과창으로, 없으면 더빙 시작 화면으로 분기하는데 사용됩니다.
     """
-    # 로깅 추가
-    logging.info(f"[토큰 분석 상태 조회] user_id={current_user.id}, token_id={token_id}")
-    
     # 해당 토큰의 스크립트들과 내 분석 결과 조회 (현재 DB 구조에 맞게 수정)
     results = (
         db.query(Script, AnalysisResult)
@@ -236,7 +232,6 @@ def get_token_analysis_status(
     )
     
     if not results:
-        logging.warning(f"[토큰 분석 상태 조회 실패] 토큰을 찾을 수 없음: token_id={token_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Token not found"
@@ -264,8 +259,6 @@ def get_token_analysis_status(
                 "script_text": script.script,
                 "has_result": False
             })
-    
-    logging.info(f"[토큰 분석 상태 조회 완료] has_analysis={has_any_analysis}, script_results_count={len(script_results)}")
     
     return TokenAnalysisStatusResponse(
         token_id=token_id,
