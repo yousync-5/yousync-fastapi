@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from models import Script
 from pydub import AudioSegment
-from router.utils_s3 import load_user_audio_from_s3
+from router.utils_s3 import load_user_audio_from_s3, upload_audio_to_s3
 
 import os
 import re
@@ -62,7 +62,13 @@ def prepare_dub_segments(user_id: int, token_id: int, scripts: list,  token_star
 
 
 
-def synthesize_audio_from_segments(background: AudioSegment, original: AudioSegment, segments: list, output_path: str = "final_mix.wav"):
+def synthesize_audio_from_segments(
+    background: AudioSegment, 
+    original: AudioSegment, 
+    segments: list, 
+    user_id: int, 
+    token_id: int
+) -> str:
     result = background[:]
 
     # 1. 내 음성 덮어쓰기
@@ -71,23 +77,32 @@ def synthesize_audio_from_segments(background: AudioSegment, original: AudioSegm
         end_ms = int(seg["end"] * 1000)
         print(f"🎤 내 더빙 구간: {seg['start']}s ~ {seg['end']}s")
 
+        # 원본 오디오의 해당 부분을 먼저 잘라내고, 그 다음에 사용자 음성을 오버레이합니다.
+        # 이 방식은 원본의 소리를 완전히 대치합니다.
         result = result.overlay(AudioSegment.silent(duration=end_ms - start_ms), position=start_ms)
         result = result.overlay(seg["audio"], position=start_ms)
 
-    # 2. 상대방 음성 삽입
+    # 2. 상대방 음성(원본 보컬) 삽입
     print("🗣️ 상대방 음성 덮어쓰기 중...")
-
-    current = 0
-    for seg in segments:
+    
+    current_position_ms = 0
+    for seg in sorted(segments, key=lambda x: x['start']):
         start_ms = int(seg["start"] * 1000)
-        if current < start_ms:
-            part = original[current:start_ms]
-            result = result.overlay(part, position=current)
-        current = int(seg["end"] * 1000)
+        end_ms = int(seg["end"] * 1000)
 
-    if current < len(original):
-        part = original[current:]
-        result = result.overlay(part, position=current)
+        # 현재 위치와 내 더빙 시작점 사이에 비어있는 공간(상대방 목소리)을 원본으로 채웁니다.
+        if current_position_ms < start_ms:
+            original_part = original[current_position_ms:start_ms]
+            result = result.overlay(original_part, position=current_position_ms)
+        
+        current_position_ms = end_ms
 
-    result.export(output_path, format="wav")
-    print("✅ 합성 완료 → final_mix.wav 저장됨")
+    # 마지막 더빙 이후의 남은 부분을 원본으로 채웁니다.
+    if current_position_ms < len(original):
+        remaining_part = original[current_position_ms:]
+        result = result.overlay(remaining_part, position=current_position_ms)
+
+    # S3에 업로드하고 S3 키를 반환
+    s3_key = upload_audio_to_s3(result, user_id, token_id)
+    
+    return s3_key

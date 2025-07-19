@@ -93,3 +93,33 @@ def load_user_audio_from_s3(user_id: int, token_id: int, script_id: int) -> Audi
         return None
 
 
+def upload_audio_to_s3(audio_segment: AudioSegment, user_id: int, token_id: int) -> str:
+    key = f"user_Dubbing_auido/{user_id}/{token_id}/dubbing_audio.wav"
+    
+    # AudioSegment를 메모리 내 바이트 버퍼로 내보내기
+    buffer = io.BytesIO()
+    audio_segment.export(buffer, format="wav")
+    buffer.seek(0)  # 버퍼의 시작으로 포인터 이동
+
+    try:
+        print(f"☁️ S3에 합성 음성 업로드 중: s3://{DEFAULT_BUCKET}/{key}")
+        s3.put_object(Bucket=DEFAULT_BUCKET, Key=key, Body=buffer, ContentType="audio/wav")
+        print(f"✅ S3 업로드 성공: {key}")
+        return key
+    except Exception as e:
+        logging.error(f"❌ S3 업로드 실패: {key} → {e}")
+        raise
+
+def generate_presigned_url(key: str, expiration: int = 3600) -> str:
+    try:
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': DEFAULT_BUCKET, 'Key': key},
+            ExpiresIn=expiration
+        )
+        return url
+    except Exception as e:
+        logging.error(f"❌ Pre-signed URL 생성 실패: {key} → {e}")
+        raise
+
+
