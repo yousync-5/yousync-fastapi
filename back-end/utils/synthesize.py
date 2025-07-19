@@ -7,8 +7,9 @@ from router.utils_s3 import load_user_audio_from_s3
 import os
 import re
 
+
 def extract_youtube_video_id(url: str) -> str:
-    # https://youtu.be/abc123XYZ
+
     match = re.search(r"(?:youtu\.be/|v=)([a-zA-Z0-9_-]+)", url)
     if match:
         return match.group(1)
@@ -61,7 +62,7 @@ def prepare_dub_segments(user_id: int, token_id: int, scripts: list,  token_star
 
 
 
-def synthesize_audio_from_segments(background: AudioSegment, original: AudioSegment, segments: list):
+def synthesize_audio_from_segments(background: AudioSegment, original: AudioSegment, segments: list, output_path: str = "final_mix.wav"):
     result = background[:]
 
     # 1. 내 음성 덮어쓰기
@@ -88,5 +89,5 @@ def synthesize_audio_from_segments(background: AudioSegment, original: AudioSegm
         part = original[current:]
         result = result.overlay(part, position=current)
 
-    result.export("final_mix.wav", format="wav")
+    result.export(output_path, format="wav")
     print("✅ 합성 완료 → final_mix.wav 저장됨")
