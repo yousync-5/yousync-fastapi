@@ -1,6 +1,6 @@
 # step1_get_scripts.py
 from sqlalchemy.orm import Session
-from models import Script
+from models import Script, DubbingResult, Token # DubbingResult, Token 모델 추가
 from pydub import AudioSegment
 from router.utils_s3 import load_user_audio_from_s3, upload_audio_to_s3, load_main_audio_from_s3
 from database import get_db
@@ -8,6 +8,7 @@ import asyncio
 
 import os
 import re
+import uuid # uuid 모듈 추가
 
 
 def extract_youtube_video_id(url: str) -> str:
@@ -137,6 +138,30 @@ async def run_synthesis_async(token_id: int, user_id: int) -> str:
         )
         
         print(f"비동기 작업 완료, 결과물 S3 Key: {s3_key}")
+
+        # 더빙 결과 DB에 저장
+        try:
+            # 토큰 정보를 다시 조회하여 actor_id를 가져옵니다.
+            token_obj = db.query(Token).filter(Token.id == token_id).first()
+            if not token_obj:
+                raise ValueError("Token not found when trying to save dubbing result")
+
+            new_dubbing_result = DubbingResult(
+                user_id=user_id,
+                token_id=token_id,
+                # actor_id=token_obj.actor_id, # Token에서 actor_id 가져오기
+                s3_key=s3_key
+            )
+            db.add(new_dubbing_result)
+            db.commit()
+            print(f"더빙 결과 저장 완료: user_id={user_id}, token_id={token_id}, s3_key={s3_key}")
+        except Exception as e:
+            db.rollback()
+            print(f"더빙 결과 DB 저장 중 오류 발생: {e}")
+            # DB 저장 실패 시에도 S3 업로드는 성공했으므로, 예외를 다시 발생시키지 않고 로그만 남길 수 있습니다.
+            # 하지만 여기서는 명확한 오류 처리를 위해 다시 발생시킵니다.
+            raise
+
         return s3_key
 
     except Exception as e:
