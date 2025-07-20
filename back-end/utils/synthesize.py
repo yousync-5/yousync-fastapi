@@ -2,7 +2,9 @@
 from sqlalchemy.orm import Session
 from models import Script
 from pydub import AudioSegment
-from router.utils_s3 import load_user_audio_from_s3, upload_audio_to_s3
+from router.utils_s3 import load_user_audio_from_s3, upload_audio_to_s3, load_main_audio_from_s3
+from database import get_db
+import asyncio
 
 import os
 import re
@@ -13,14 +15,14 @@ def extract_youtube_video_id(url: str) -> str:
     match = re.search(r"(?:youtu\.be/|v=)([a-zA-Z0-9_-]+)", url)
     if match:
         return match.group(1)
-    raise ValueError(f"❌ 유효한 YouTube URL 아님: {url}")
+    raise ValueError(f"유효한 YouTube URL 아닙니다: {url}")
 
 
 def get_token_info(session: Session, token_id: int):
     from models import Token
     token = session.query(Token).filter(Token.id == token_id).first()
     if token is None:
-        raise ValueError(f"❌ token_id={token_id}에 해당하는 Token이 없습니다.")
+        raise ValueError(f"token_id={token_id}에 해당하는 Token이 없습니다.")
 
     actor_name = token.actor_name
     youtube_url = token.youtube_url
@@ -75,7 +77,7 @@ def synthesize_audio_from_segments(
     for seg in segments:
         start_ms = int(seg["start"] * 1000)
         end_ms = int(seg["end"] * 1000)
-        print(f"🎤 내 더빙 구간: {seg['start']}s ~ {seg['end']}s")
+        print(f"내 더빙 구간: {seg['start']}s ~ {seg['end']}s")
 
         # 원본 오디오의 해당 부분을 먼저 잘라내고, 그 다음에 사용자 음성을 오버레이합니다.
         # 이 방식은 원본의 소리를 완전히 대치합니다.
@@ -83,7 +85,7 @@ def synthesize_audio_from_segments(
         result = result.overlay(seg["audio"], position=start_ms)
 
     # 2. 상대방 음성(원본 보컬) 삽입
-    print("🗣️ 상대방 음성 덮어쓰기 중...")
+    print("상대방 음성 덮어쓰기 중...")
     
     current_position_ms = 0
     for seg in sorted(segments, key=lambda x: x['start']):
@@ -106,3 +108,40 @@ def synthesize_audio_from_segments(
     s3_key = upload_audio_to_s3(result, user_id, token_id)
     
     return s3_key
+
+
+async def run_synthesis_async(token_id: int, user_id: int) -> str:
+    db: Session = next(get_db())
+    try:
+        print(f"비동기 합성 작업 시작: user_id={user_id}, token_id={token_id}")
+
+        # DB 접근은 동기적으로 수행 (일반적으로 매우 빠름)
+        actor_name, video_id, token_start_time = get_token_info(db, token_id)
+        scripts = get_scripts_by_token(db, token_id)
+
+        # I/O 바운드 작업을 별도 스레드에서 실행
+        background, original = await asyncio.to_thread(load_main_audio_from_s3, actor_name, video_id)
+        segments = await asyncio.to_thread(prepare_dub_segments, user_id, token_id, scripts, token_start_time)
+
+        if not segments:
+            raise ValueError(f"사용자 더빙 음성이 없어 작업을 중단합니다.")
+
+        # CPU 바운드 작업(합성) 및 I/O 바운드 작업(업로드)을 별도 스레드에서 실행
+        s3_key = await asyncio.to_thread(
+            synthesize_audio_from_segments,
+            background,
+            original,
+            segments,
+            user_id,
+            token_id
+        )
+        
+        print(f"비동기 작업 완료, 결과물 S3 Key: {s3_key}")
+        return s3_key
+
+    except Exception as e:
+        print(f"비동기 작업 중 오류 발생: {e}")
+        raise
+    finally:
+        db.close()
+
