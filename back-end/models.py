@@ -57,6 +57,13 @@ class Token(Base):
         passive_deletes=True
     )
 
+    dubbing_results = relationship(
+        "DubbingResult",
+        back_populates="token",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
 
 class URL(Base):
     __tablename__ = "urls"
@@ -217,6 +224,13 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+
+    dubbing_results = relationship(
+        "DubbingResult",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
     
 # 사용자 선호도 조사
 # 사용자 id - AnlysisResult
@@ -290,6 +304,20 @@ class YoutubeProcessJob(Base):
     result = Column(JSON, nullable=True) # 전처리 서버에서 받은 최종 결과 (예: token_id, 기타 메타데이터)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class DubbingResult(Base):
+    __tablename__ = "dubbing_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False, index=True)
+    s3_key = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="dubbing_results")
+    token = relationship("Token", back_populates="dubbing_results")
+
 
 # 점수 조회용 모델
 # class UserTokenScore(Base):

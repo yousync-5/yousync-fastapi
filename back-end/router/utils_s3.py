@@ -2,6 +2,7 @@ import os, boto3, json, urllib.parse, httpx, logging
 from typing import Any, Optional
 import io
 from pydub import AudioSegment
+import uuid
 
 # 기본 버킷 이름을 환경 변수 또는 상수로 설정
 DEFAULT_BUCKET = os.getenv("S3_BUCKET_NAME")
@@ -94,7 +95,9 @@ def load_user_audio_from_s3(user_id: int, token_id: int, script_id: int) -> Audi
 
 
 def upload_audio_to_s3(audio_segment: AudioSegment, user_id: int, token_id: int) -> str:
-    key = f"user_Dubbing_auido/{user_id}/{token_id}/dubbing_audio.wav"
+    # 고유한 파일명 생성을 위해 UUID 사용
+    unique_filename = f"dubbing_audio_{uuid.uuid4()}.wav"
+    key = f"user_Dubbing_auido/{user_id}/{token_id}/{unique_filename}"
     
     # AudioSegment를 메모리 내 바이트 버퍼로 내보내기
     buffer = io.BytesIO()
