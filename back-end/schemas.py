@@ -301,3 +301,25 @@ class DuetScene(BaseModel):
         from_attributes = True
 
 
+# === videoRequestCreate
+class VideoRequestCreate(BaseModel):
+    actor: str
+    content: str
+    url: str
+
+class VideoRequestResponse(BaseModel):
+    id: int
+    actor: str
+    content: str
+    url: str
+    status: str
+    date: datetime
+    requester: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+class VideoRequestStatusUpdate(BaseModel):
+    status: str 
+
+
