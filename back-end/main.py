@@ -71,29 +71,24 @@ app = FastAPI(
     redoc_url="/redoc",     # ReDoc 경로
     lifespan=lifespan
 )
+# 허용할 프론트엔드 주소 목록
+origins = [
+    "http://localhost:3000",
+    # 실제 프로덕션 프론트엔드 주소가 있다면 추가
+    # "https://your-frontend-domain.com", 
+]
 
 
 # CORS 미들웨어 설정 - 프론트엔드에서 API 호출을 허용하기 위함
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # 모든 도메인에서의 접근 허용 (프로덕션에서는 특정 도메인만 허용하는 것이 보안상 좋음)
+    allow_origins=origins,        
     allow_credentials=True,     # 쿠키/인증 정보 포함한 요청 허용
     allow_methods=["*"],        # 모든 HTTP 메서드 허용 (GET, POST, PUT, DELETE 등)
     allow_headers=["*"],        # 모든 헤더 허용
+
 )
 
-# API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
-# app.include_router(auth_router)    # /auth 경로로 인증 관련 API 등록
-# app.include_router(actor_router)   # /actors 경로로 배우 관련 API 등록
-# app.include_router(token_router)   # /tokens 경로로 토큰 관련 API 등록
-# app.include_router(script_router)  # /scripts 경로로 스크립트 관련 API 등록
-# app.include_router(user_audio_router) # /tokens/{token_id}/upload-audio 경로로 유저 음성 데이터 관련 API 등록
-# app.include_router(mypage_router) # /mapage 결로로 스크립트 관련 API 등록
-# app.include_router(script_audio_router)
-# app.include_router(url_router) # url 관련 라우터
-# app.include_router(score_router) # /score 경로로 점수 관련 API 등록
-# app.include_router(youtube_process_router) # /youtube 경로로 유튜브 전처리 관련 API 등록
-# app.include_router(duet_router)    # /duet 경로로 듀엣 관련 API 등록
 # # API 라우터 등록 - 각 도메인별로 분리된 엔드포인트들을 메인 앱에 연결
 app.include_router(auth_router, prefix="/api")    # /auth 경로로 인증 관련 API 등록
 app.include_router(actor_router, prefix="/api")   # /actors 경로로 배우 관련 API 등록

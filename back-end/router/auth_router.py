@@ -40,7 +40,7 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_fallback_value")
 
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
 # HTTP Bearer 토큰 스키마

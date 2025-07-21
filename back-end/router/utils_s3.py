@@ -62,7 +62,7 @@ def presign(s3_client, url: Optional[str], exp: int = 900) -> Optional[str]:
 
 #==========================# 병합 더빙 음성 제공용
 
-s3 = boto3.client("s3")
+s3 = boto3.client("s3", region_name='ap-northeast-2')
 
 def load_main_audio_from_s3(actor_name: str, video_id: str):
     base_prefix = f"{actor_name}/{video_id}/0/"
