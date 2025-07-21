@@ -70,8 +70,8 @@ def get_all_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
+    # if not current_user.is_admin:
+    #     raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
 
     requests = db.query(VideoRequest).all()
 
