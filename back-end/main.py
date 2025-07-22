@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import boto3
 import os
+from starlette.middleware.cors import CORSMiddleware
 
 # 데이터베이스 관련 임포트
 from database import engine
@@ -75,6 +76,7 @@ app = FastAPI(
 # 허용할 프론트엔드 주소 목록
 origins = [
     "http://localhost:3000",
+    "https://yousync.link"
     # 실제 프로덕션 프론트엔드 주소가 있다면 추가
     # "https://your-frontend-domain.com", 
 ]

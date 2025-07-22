@@ -307,10 +307,42 @@ async def manual_cleanup_anonymous_results():
     return {"message": "익명 사용자 결과 정리 작업 완료"}
 
 # 4) SSE 진행 스트림
+# @router.get("/analysis-progress/{job_id}")
+# async def stream_progress(job_id: str):
+#     async def gen():
+#         while True:
+#             db = SessionLocal()
+#             try:
+#                 r = get_script_result(db, job_id)
+#                 if not r:
+#                     yield "data: {\"error\":\"Job not found\"}\n\n"
+#                     break
+#                 data = {
+#                     "job_id":   r.job_id,
+#                     "status":   r.status,
+#                     "progress": r.progress,
+#                     "message":  r.message,
+#                     "result":   r.result,
+#                 }
+#                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+#                 if r.status in ("completed", "failed"): break
+#             finally:
+#                 db.close()
+#             await asyncio.sleep(1)
+#     return StreamingResponse(gen(), media_type="text/event-stream",
+#                              headers={"Cache-Control":"no-cache",
+#                                       "Connection":"keep-alive",
+#                                       "Access-Control-Allow-Origin":"*"})
 @router.get("/analysis-progress/{job_id}")
-async def stream_progress(job_id: str):
+async def stream_progress(job_id: str, request: Request):
     async def gen():
+        max_runtime = 30
+        start_time = datetime.utcnow()
+
         while True:
+            if await request.is_disconnected():
+                print(f"[SSE] 연결 종료 감지됨: job_id={job_id}")
+                break
             db = SessionLocal()
             try:
                 r = get_script_result(db, job_id)
@@ -325,7 +357,11 @@ async def stream_progress(job_id: str):
                     "result":   r.result,
                 }
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                if r.status in ("completed", "failed"): break
+                if r.status in ("completed", "failed"):
+                    break
+                if (datetime.utcnow() - start_time).total_seconds() > max_runtime:
+                    print(f"[SSE] SSE 타임아웃 종료: job_id={job_id}")
+                    break
             finally:
                 db.close()
             await asyncio.sleep(1)

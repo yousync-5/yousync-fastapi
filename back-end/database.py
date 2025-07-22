@@ -18,7 +18,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if "sqlite" in DATABASE_URL:
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL)  # PostgreSQL은 별도 옵션 불필요
+    # 👇 이렇게 수정합니다.
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,      # 기본 커넥션 20개
+        max_overflow=20    # 추가 커넥션 20개
+    )
 
 # 데이터베이스 세션 팩토리 생성
 # autocommit=False: 명시적으로 commit() 호출해야 변경사항 저장
