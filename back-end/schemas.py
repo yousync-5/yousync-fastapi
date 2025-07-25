@@ -323,3 +323,11 @@ class VideoRequestStatusUpdate(BaseModel):
     status: str 
 
 
+class AudioURL(BaseModel):
+    script_id: int
+    url: str
+
+class UserAudioResponse(BaseModel):
+    audios: List[AudioURL] 
+
+

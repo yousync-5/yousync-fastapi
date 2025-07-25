@@ -1,15 +1,18 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
-from sqlalchemy import update
+from sqlalchemy import update, func
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+import os
 
-# 데이터베이스 관련 임포트
 from database import get_db
-from models import Token, Actor, TokenActor
-from schemas import Token as TokenSchema
-from schemas import TokenCreate,TokenDetail, ViewCountResponse
+from models import Token, Actor, TokenActor, User
+from schemas import Token as TokenSchema, TokenCreate, TokenDetail, ViewCountResponse, AudioURL, UserAudioResponse
 from .utils_s3 import load_json, presign
+from router.auth_router import get_current_user
+
+# ────────────── S3 설정 ──────────────
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
 # APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
 router = APIRouter(
@@ -60,6 +63,17 @@ def read_popular_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(g
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
     tokens = db.query(Token).order_by(Token.view_count.desc()).offset(skip).limit(limit).all()
+    return tokens
+
+@router.get("/sync-collection/", response_model=List[TokenSchema])
+def read_sync_collection_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    재생 시간이 15초 미만인 토큰 목록을 조회합니다.
+    
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    tokens = db.query(Token).filter(Token.end_time - Token.start_time < 20).order_by(func.random()).offset(skip).limit(limit).all()
     return tokens
 
 #카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
@@ -194,23 +208,6 @@ def increment_view(token_id: int, db: Session = Depends(get_db)):
     return {"token_id": token.id, "view_count": token.view_count}
 
 
-# ────────────── 추가 임포트 ──────────────
-import os
-from typing import Optional
-from pydantic import BaseModel, Field
-from router.auth_router import get_current_user
-from models import User
-
-# ────────────── S3 설정 ──────────────
-S3_BUCKET = os.getenv("S3_BUCKET_NAME")
-
-# ────────────── 응답 스키마 ──────────────
-class AudioURL(BaseModel):
-    script_id: int
-    url: str
-
-class UserAudioResponse(BaseModel):
-    audios: List[AudioURL]
 
 # ────────────── API 엔드포인트 ──────────────
 @router.get("/{token_id}/user-audios", response_model=UserAudioResponse)
