@@ -1,15 +1,18 @@
 # 영화 관련 API 엔드포인트들을 관리하는 라우터
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
-from sqlalchemy import update
+from sqlalchemy import update, func
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+import os
 
-# 데이터베이스 관련 임포트
 from database import get_db
-from models import Token, Actor, TokenActor
-from schemas import Token as TokenSchema
-from schemas import TokenCreate,TokenDetail, ViewCountResponse
+from models import Token, Actor, TokenActor, User, DubbingResult
+from schemas import Token as TokenSchema, TokenCreate, TokenDetail, ViewCountResponse, AudioURL, UserAudioResponse, DubbingUrlResponse
 from .utils_s3 import load_json, presign
+from router.auth_router import get_current_user
+
+# ────────────── S3 설정 ──────────────
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 
 # APIRouter 인스턴스 생성 - 모든 영화 관련 엔드포인트의 접두사로 "/movies" 사용
 router = APIRouter(
@@ -60,6 +63,17 @@ def read_popular_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(g
     - **limit**: 가져올 최대 항목 수 (기본값: 100)
     """
     tokens = db.query(Token).order_by(Token.view_count.desc()).offset(skip).limit(limit).all()
+    return tokens
+
+@router.get("/sync-collection/", response_model=List[TokenSchema])
+def read_sync_collection_tokens(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    재생 시간이 15초 미만인 토큰 목록을 조회합니다.
+    
+    - **skip**: 건너뛸 항목 수 (기본값: 0)
+    - **limit**: 가져올 최대 항목 수 (기본값: 100)
+    """
+    tokens = db.query(Token).filter(Token.end_time - Token.start_time < 20).order_by(func.random()).offset(skip).limit(limit).all()
     return tokens
 
 #카테고리별 영화 조회 API - 특정 카테고리의 영화들만 가져오기
@@ -194,23 +208,6 @@ def increment_view(token_id: int, db: Session = Depends(get_db)):
     return {"token_id": token.id, "view_count": token.view_count}
 
 
-# ────────────── 추가 임포트 ──────────────
-import os
-from typing import Optional
-from pydantic import BaseModel, Field
-from router.auth_router import get_current_user
-from models import User
-
-# ────────────── S3 설정 ──────────────
-S3_BUCKET = os.getenv("S3_BUCKET_NAME")
-
-# ────────────── 응답 스키마 ──────────────
-class AudioURL(BaseModel):
-    script_id: int
-    url: str
-
-class UserAudioResponse(BaseModel):
-    audios: List[AudioURL]
 
 # ────────────── API 엔드포인트 ──────────────
 @router.get("/{token_id}/user-audios", response_model=UserAudioResponse)
@@ -254,5 +251,41 @@ def get_user_audios_for_token(
             audio_urls.append(AudioURL(script_id=script_id, url=presigned_url))
 
     return UserAudioResponse(audios=audio_urls)
+
+
+@router.get("/{token_id}/latest-dubbing/", response_model=DubbingUrlResponse)
+def get_latest_dubbing_audio(
+    request: Request,
+    token_id: int = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 토큰에 대해 현재 로그인한 사용자의 가장 최신 더빙 음성 파일의
+    임시 접근 URL(presigned URL)을 반환합니다.
+    """
+    s3_client = request.app.state.s3_client
+    user_id = current_user.id
+
+    latest_dubbing = (
+        db.query(DubbingResult)
+        .filter(
+            DubbingResult.user_id == user_id,
+            DubbingResult.token_id == token_id
+        )
+        .order_by(DubbingResult.created_at.desc())
+        .first()
+    )
+
+    if not latest_dubbing:
+        raise HTTPException(status_code=404, detail="해당 토큰에 대한 더빙 기록을 찾을 수 없습니다.")
+
+    presigned_url = s3_client.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': S3_BUCKET, 'Key': latest_dubbing.s3_key},
+        ExpiresIn=3600  # 1시간 동안 유효
+    )
+
+    return DubbingUrlResponse(url=presigned_url)
 
 
