@@ -3,7 +3,7 @@
 import os, logging, boto3, asyncio, json
 from uuid import uuid4
 from typing import List
-from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks, Depends
+from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks, Depends, Form
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
 import httpx
@@ -411,7 +411,7 @@ def get_sqs_queue_status():
 async def batch_upload_audio(
     request: Request,
     files: List[UploadFile] = File(...),
-    token_ids: List[str] = None,  # 각 파일에 대응하는 token_id
+    token_ids: str = Form(...),  # 쉼표로 구분된 문자열로 받기
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -421,23 +421,22 @@ async def batch_upload_audio(
     
     Args:
         files: 업로드할 오디오 파일들
-        token_ids: 각 파일에 대응하는 token_id 리스트 (선택사항)
+        token_ids: 쉼표로 구분된 token_id 문자열 (예: "1,2,3")
     
     Returns:
         job_ids: 각 파일의 작업 ID 리스트
     """
-    if token_ids and len(files) != len(token_ids):
-        raise HTTPException(400, "파일 수와 token_id 수가 일치하지 않습니다")
+    # 쉼표로 구분된 문자열을 리스트로 변환
+    token_id_list = [tid.strip() for tid in token_ids.split(",") if tid.strip()]
     
-    # token_ids가 없으면 첫 번째 파일의 이름에서 추출하거나 기본값 사용
-    if not token_ids:
-        token_ids = ["1"] * len(files)  # 기본값 또는 파일명에서 추출 로직
+    if len(files) != len(token_id_list):
+        raise HTTPException(400, f"파일 수({len(files)})와 token_id 수({len(token_id_list)})가 일치하지 않습니다")
     
     s3_client = request.app.state.s3_client
     job_ids = []
     
     # 각 파일에 대해 job_id 생성 및 초기 상태 저장
-    for i, (file, token_id) in enumerate(zip(files, token_ids)):
+    for i, (file, token_id) in enumerate(zip(files, token_id_list)):
         job_id = str(uuid4())
         job_ids.append(job_id)
         
@@ -450,7 +449,7 @@ async def batch_upload_audio(
         process_batch_files_parallel,
         s3_client,
         [(await file.read(), file.filename) for file in files],  # 파일 데이터 미리 읽기
-        token_ids,
+        token_id_list,
         job_ids,
         current_user.id
     )
