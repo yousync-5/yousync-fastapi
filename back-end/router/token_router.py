@@ -101,7 +101,7 @@ async def read_token(
     토큰 + scripts + pitch.json + bgvoice presigned URL
     """
     s3_client = request.app.state.s3_client
-    token: Token | None = db.query(Token).filter(Token.id == token_id).first()
+    token: Optional[Token] = db.query(Token).filter(Token.id == token_id).first()
     if token is None:
         raise HTTPException(404, "Token not found")
 
