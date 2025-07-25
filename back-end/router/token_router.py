@@ -6,8 +6,8 @@ from typing import List, Optional
 import os
 
 from database import get_db
-from models import Token, Actor, TokenActor, User
-from schemas import Token as TokenSchema, TokenCreate, TokenDetail, ViewCountResponse, AudioURL, UserAudioResponse
+from models import Token, Actor, TokenActor, User, DubbingResult
+from schemas import Token as TokenSchema, TokenCreate, TokenDetail, ViewCountResponse, AudioURL, UserAudioResponse, DubbingUrlResponse
 from .utils_s3 import load_json, presign
 from router.auth_router import get_current_user
 
@@ -251,5 +251,41 @@ def get_user_audios_for_token(
             audio_urls.append(AudioURL(script_id=script_id, url=presigned_url))
 
     return UserAudioResponse(audios=audio_urls)
+
+
+@router.get("/{token_id}/latest-dubbing/", response_model=DubbingUrlResponse)
+def get_latest_dubbing_audio(
+    request: Request,
+    token_id: int = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 토큰에 대해 현재 로그인한 사용자의 가장 최신 더빙 음성 파일의
+    임시 접근 URL(presigned URL)을 반환합니다.
+    """
+    s3_client = request.app.state.s3_client
+    user_id = current_user.id
+
+    latest_dubbing = (
+        db.query(DubbingResult)
+        .filter(
+            DubbingResult.user_id == user_id,
+            DubbingResult.token_id == token_id
+        )
+        .order_by(DubbingResult.created_at.desc())
+        .first()
+    )
+
+    if not latest_dubbing:
+        raise HTTPException(status_code=404, detail="해당 토큰에 대한 더빙 기록을 찾을 수 없습니다.")
+
+    presigned_url = s3_client.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': S3_BUCKET, 'Key': latest_dubbing.s3_key},
+        ExpiresIn=3600  # 1시간 동안 유효
+    )
+
+    return DubbingUrlResponse(url=presigned_url)
 
 
