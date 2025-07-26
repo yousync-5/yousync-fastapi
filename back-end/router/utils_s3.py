@@ -78,11 +78,13 @@ def load_main_audio_from_s3(actor_name: str, video_id: str):
     return bgvoice, vocal  # background, original
 
 
+from typing import Optional
+from pydub import AudioSegment
 
 # AWS_DEFAULT_BUCKET = os.getenv("AWS_S3_BUCKET_NAME")
 
 
-def load_user_audio_from_s3(user_id: int, token_id: int, script_id: int) -> AudioSegment | None:
+def load_user_audio_from_s3(user_id: int, token_id: int, script_id: int) -> Optional[AudioSegment]:
     key = f"user_audio/{user_id}/{token_id}/{script_id}.wav"
     try:
         print(f"☁️ S3에서 사용자 음성 로딩 중: s3://{DEFAULT_BUCKET}/{key}")

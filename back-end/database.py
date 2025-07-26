@@ -21,8 +21,10 @@ else:
     # 👇 이렇게 수정합니다.
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,      # 기본 커넥션 20개
-        max_overflow=20    # 추가 커넥션 20개
+        pool_size=20,          # 기본 5 → 20으로 증가
+        max_overflow=30,       # 추가 연결 허용
+        pool_pre_ping=True,    # 연결 상태 확인
+        pool_recycle=3600      # 1시간마다 연결 재생성
     )
 
 # 데이터베이스 세션 팩토리 생성

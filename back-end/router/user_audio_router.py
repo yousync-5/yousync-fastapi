@@ -2,7 +2,8 @@
 
 import os, logging, boto3, asyncio, json
 from uuid import uuid4
-from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks, Depends
+from typing import List
+from fastapi import APIRouter, UploadFile, File, Path, HTTPException, Request, BackgroundTasks, Depends, Form
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
 import httpx
@@ -401,3 +402,189 @@ def get_sqs_queue_status():
             "message": f"SQS 상태 조회 실패: {str(e)}",
             "sqs_enabled": os.getenv('USE_SQS_QUEUE', 'false').lower() == 'true'
         }
+
+# ═══════════════════════════════════════════════════════════════
+# 🚀 배치 처리 기능 (여러 파일 동시 처리)
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/batch-upload/")
+async def batch_upload_audio(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    token_ids: str = Form(...),  # 쉼표로 구분된 문자열로 받기
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    여러 오디오 파일을 동시에 업로드하고 병렬로 분석 요청
+    
+    Args:
+        files: 업로드할 오디오 파일들
+        token_ids: 쉼표로 구분된 token_id 문자열 (예: "1,2,3")
+    
+    Returns:
+        job_ids: 각 파일의 작업 ID 리스트
+    """
+    # 쉼표로 구분된 문자열을 리스트로 변환
+    token_id_list = [tid.strip() for tid in token_ids.split(",") if tid.strip()]
+    
+    if len(files) != len(token_id_list):
+        raise HTTPException(400, f"파일 수({len(files)})와 token_id 수({len(token_id_list)})가 일치하지 않습니다")
+    
+    s3_client = request.app.state.s3_client
+    job_ids = []
+    
+    # 각 파일에 대해 job_id 생성 및 초기 상태 저장
+    for i, (file, token_id) in enumerate(zip(files, token_id_list)):
+        job_id = str(uuid4())
+        job_ids.append(job_id)
+        
+        # DB에 초기 상태 저장
+        create_analysis_result(db, job_id, int(token_id), current_user.id)
+        logging.info(f"[배치 작업 생성] job_id={job_id}, file={file.filename}, token_id={token_id}")
+    
+    # 백그라운드에서 병렬 처리 시작
+    background_tasks.add_task(
+        process_batch_files_parallel,
+        s3_client,
+        [(await file.read(), file.filename) for file in files],  # 파일 데이터 미리 읽기
+        token_id_list,
+        job_ids,
+        current_user.id
+    )
+    
+    return {
+        "message": f"{len(files)}개 파일 배치 처리 시작",
+        "job_ids": job_ids,
+        "total_files": len(files)
+    }
+
+async def process_batch_files_parallel(
+    s3_client,
+    file_data_list: List[tuple],  # (file_data, filename) 튜플 리스트
+    token_ids: List[str],
+    job_ids: List[str],
+    user_id: int
+):
+    """여러 파일을 병렬로 처리하는 백그라운드 함수"""
+    
+    async def process_single_file_async(file_data: bytes, filename: str, token_id: str, job_id: str):
+        """단일 파일 비동기 처리"""
+        from database import SessionLocal
+        bg_db = SessionLocal()
+        
+        try:
+            logging.info(f"[배치 처리 시작] job_id={job_id}, file={filename}")
+            
+            # 토큰 정보 조회
+            token_info = await get_token_by_id(token_id, bg_db)
+            
+            # 1. S3 업로드
+            update_analysis_result(bg_db, job_id, progress=20, message="S3 업로드 중...")
+            s3_key = await upload_to_s3_async(s3_client, file_data, filename)
+            s3_url = f"s3://{S3_BUCKET}/{s3_key}"
+            
+            # 2. 분석 서버 요청 준비
+            update_analysis_result(bg_db, job_id, progress=50, message="분석 서버 요청 중...")
+            webhook_url = f"{WEBHOOK_URL}?job_id={job_id}"
+            
+            # 3. 분석 서버에 비동기 요청
+            await send_analysis_request_async(
+                s3_url, token_id, webhook_url, job_id, token_info
+            )
+            
+            # 4. 요청 완료 상태 업데이트
+            update_analysis_result(
+                bg_db, job_id, 
+                status="processing", 
+                progress=80, 
+                message="분석 서버에서 처리 중..."
+            )
+            
+            logging.info(f"[배치 처리 성공] job_id={job_id}, file={filename}")
+            
+        except Exception as e:
+            logging.error(f"[배치 처리 실패] job_id={job_id}, file={filename}, error={e}")
+            update_analysis_result(
+                bg_db, job_id, 
+                status="failed", 
+                progress=0, 
+                message=f"처리 실패: {str(e)}"
+            )
+        finally:
+            bg_db.close()
+    
+    # 🚀 핵심: asyncio.gather로 모든 파일을 동시에 처리
+    tasks = [
+        process_single_file_async(file_data, filename, token_id, job_id)
+        for (file_data, filename), token_id, job_id in zip(file_data_list, token_ids, job_ids)
+    ]
+    
+    try:
+        # 모든 작업을 병렬로 실행
+        await asyncio.gather(*tasks, return_exceptions=True)
+        logging.info(f"[배치 처리 완료] 총 {len(file_data_list)}개 파일 처리 완료")
+    except Exception as e:
+        logging.error(f"[배치 처리 오류] {e}")
+
+@router.get("/batch-progress/")
+async def get_batch_progress(
+    job_ids: str,  # 쉼표로 구분된 job_id 문자열
+    db: Session = Depends(get_db)
+):
+    """
+    배치 작업들의 진행 상황 조회
+    
+    Args:
+        job_ids: 쉼표로 구분된 job_id 문자열 (예: "job1,job2,job3")
+    """
+    job_id_list = [jid.strip() for jid in job_ids.split(",") if jid.strip()]
+    
+    if not job_id_list:
+        raise HTTPException(400, "job_ids가 비어있습니다")
+    
+    results = []
+    completed_count = 0
+    failed_count = 0
+    
+    for job_id in job_id_list:
+        result = get_analysis_result(db, job_id)
+        if result:
+            status_info = {
+                "job_id": result.job_id,
+                "status": result.status,
+                "progress": result.progress,
+                "message": result.message,
+                "token_id": result.token_id
+            }
+            
+            if result.status == "completed":
+                completed_count += 1
+            elif result.status == "failed":
+                failed_count += 1
+                
+            results.append(status_info)
+        else:
+            results.append({
+                "job_id": job_id,
+                "status": "not_found",
+                "progress": 0,
+                "message": "작업을 찾을 수 없습니다"
+            })
+            failed_count += 1
+    
+    # 전체 진행률 계산
+    total_jobs = len(job_id_list)
+    overall_progress = (completed_count / total_jobs) * 100 if total_jobs > 0 else 0
+    
+    return {
+        "batch_results": results,
+        "summary": {
+            "total_jobs": total_jobs,
+            "completed": completed_count,
+            "failed": failed_count,
+            "in_progress": total_jobs - completed_count - failed_count,
+            "overall_progress": round(overall_progress, 1)
+        }
+    }
